@@ -120,12 +120,14 @@ pset1.dtypes
 #vergelijk waarden https://co2monitor.nl/energiebronnen/terugblik# in MW
 pset1kw=pset1.copy()
 pset1kw['volume']=pset1kw['volume']/1000
-sns.scatterplot(data=pset1kw,x="validfrom",y="volume",hue="energytype")
+sns.lineplot(data=pset1kw,x="validfrom",y="volume",hue="energytype")
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
 pset2= getnedvals(params1,[23,31,53,54,55,56],2)
 pset2kw=pset2.copy()
 pset2kw['volume']=pset2kw['volume']/1000
-sns.scatterplot(data=pset2kw,x="validfrom",y="volume",hue="energytype")
+sns.lineplot(data=pset2kw,x="validfrom",y="volume",hue="energytype")
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
 
 # +
@@ -147,15 +149,18 @@ def mkrestcat(df,defs,rtype):
     dfcalc['energytype']=str(rtype)+ " - "+ energytypes_dict[rtype]
     return dfcalc
     
-#check waarde om verschil te begrijpen
+#check waarde gemaakt in 26 om verschil te begrijpen
 pset2r=mkrestcat(pset2,{23:1,54:-0.2,55:-1},26)
-sns.scatterplot(data=pd.concat([pset2r,pset2]),x="validfrom",y="volume",hue="energytype")    
+sns.lineplot(data=pd.concat([pset2r,pset2]),x="validfrom",y="volume",hue="energytype")    
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 # -
 
+#restcat is som van met niet-duurzame middelen opgewekt
 pset1r=mkrestcat(pset1,{0:1,1:-1,2:-1,17:-1},10)
 #print(pset1r)
 #waarde om rest opwek te begrijpen
-sns.scatterplot(data=pd.concat([pset1r,pset1]),x="validfrom",y="volume",hue="energytype")  
+sns.lineplot(data=pd.concat([pset1r,pset1]),x="validfrom",y="volume",hue="energytype") 
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
 if False:
     params3= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 3,
@@ -177,14 +182,16 @@ if False:
 pset1t=mkrestcat(pd.concat ( [pset1,pset2]) ,{0:1,23:1},10)
 pset1tkw=pset1t.copy()
 pset1tkw['volume']=pset1tkw['volume']/1000
-sns.scatterplot(data=pset1tkw,x="validfrom",y="volume",hue="energytype")  
+sns.lineplot(data=pset1tkw,x="validfrom",y="volume",hue="energytype")  
+
 # +
 params1y= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
  'validfrom[strictly_before]': '2024-12-31', 'validfrom[after]': '2024-01-01'}
 
 yset1= getnedvals(params1y,[0,1,2,17,18,19],1)
-yset2= getnedvals(params1y,[23,31,53,54,55,56],2)
 # -
+
+yset2= getnedvals(params1y,[23,31,53,54,55,56],2)
 
 #sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
 egasyr=pd.concat ( [yset1,yset2]) 
