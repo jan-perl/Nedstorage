@@ -20,7 +20,8 @@ import pandas as pd
 import numpy as np
 import re
 import seaborn as sns
-import matplotlib as plt
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import subprocess
 import requests
 import json
@@ -188,73 +189,5 @@ yset2= getnedvals(params1y,[23,31,53,54,55,56],2)
 #sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
 egasyr=pd.concat ( [yset1,yset2]) 
 egasyr.to_pickle("../intermediate/egasyr2024.pkl")
-
-yset1t=mkrestcat(pd.concat ( [yset1,yset2]) ,{0:1,23:1},10)
-yset1tkw=yset1t.copy()
-yset1tkw['volume']=yset1tkw['volume']/1000
-sns.scatterplot(data=yset1tkw,x="validfrom",y="volume",hue="energytype") 
-
-yset1t0=yset1[yset1['energytypenr']==0]
-yset1t0_2023_sum=349280/3.6
-yset1t0['volume'].sum()*3.6/1e6
-yset1[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
-
-yset2t23=yset2[yset2['energytypenr']==23]
-yset2t23_2023_sum=800547
-yset2[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
-
-yset7t23_2023_sum=432838
-yset7t23=yset2t23.copy()
-yset7t23['volume']= yset7t23_2023_sum*1e6/3.6/(24*365)
-yset7t23['energytypenr']= 26
-yset7t23['energytype']= "26 - Voertuigbrandstoffen"
-yset7t23[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
-
-yset7t0=mkrestcat(pd.concat ( [yset1,yset2,yset7t23]) ,{0:1,23:1,26:1},0)
-print(yset2t23_2023_sum+ yset7t23_2023_sum+ yset1t0_2023_sum )
-yset7t0[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
-
-genmult=9
-yset8t0=mkrestcat(pd.concat ( [yset1]) ,{1:genmult,2:genmult,17:genmult},1)
-yset8t0[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
-
-landyrframe = yset8t0[['volume',"validfrom"]].rename(columns={"volume":"opwek"})
-landyrframe = landyrframe.merge ( yset7t0[['volume',"validfrom"]].rename(
-       columns={"volume":"verbruik"}) ).sort_values("validfrom")
-landyrframe.dtypes
-
-landyrframe ["balans"]= landyrframe ["opwek"]- landyrframe ["verbruik"]
-landyrframe ["cumbalans"]= landyrframe ["balans"].cumsum()
-print(landyrframe ["balans"].sum()*3.6/1e6)
-sns.scatterplot(data=landyrframe,x="validfrom",y="cumbalans") 
-
-balansfreq0=landyrframe [["balans"]].sort_values("balans",ascending=False).copy().reset_index()
-balansfreq0['n']=balansfreq0.index
-balansfreq0['totpwr']=balansfreq0['balans'].cumsum()
-sns.scatterplot(data=balansfreq0,x="totpwr",y="balans") 
-
-nhrslong=4*24
-longsteff=0.5
-longststart=15e9
-longstthresh=10e7
-#nhrslong=2
-landyrframe ["multdaybalans" ]= (landyrframe ["cumbalans" ].shift(-nhrslong)-
-                                landyrframe ["cumbalans" ])/nhrslong
-landyrframe ["multdaybalanssm" ]= np.convolve(landyrframe ["multdaybalans" ],
-                                              np.ones(nhrslong)/nhrslong,mode='same' )
-landyrframe ["tolongterm" ] = landyrframe ["multdaybalans" ]. where(
-       landyrframe ["multdaybalans" ]<0, landyrframe ["balans" ]. where(
-           landyrframe ["balans" ]>longstthresh,0) )
-landyrframe ["longtermst" ] = landyrframe ["tolongterm" ] . where(
-      landyrframe ["tolongterm" ]<0,landyrframe ["tolongterm" ] *longsteff) .cumsum() +longststart
-sns.scatterplot(data=landyrframe,x="validfrom",y="longtermst") 
-
-shortsteff=0.8
-shortststart=8e9
-landyrframe ["toshortterm" ] = landyrframe ["balans" ] -landyrframe ["tolongterm" ]
-landyrframe ["shorttermst" ] = landyrframe ["toshortterm" ] . where(
-      landyrframe ["toshortterm" ]<0,landyrframe ["toshortterm" ] *shortsteff) .cumsum() +shortststart
-#sns.scatterplot(data=landyrframe,x="validfrom",y="toshortterm") 
-sns.scatterplot(data=landyrframe,x="validfrom",y="shorttermst") 
 
 

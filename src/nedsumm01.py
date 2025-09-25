@@ -26,105 +26,23 @@ import requests
 import json
 import os
 
-myapikey = subprocess.getoutput("cat ../data/ned-api.key")
-print(myapikey)
-baseurl='https://api.ned.nl/v1'
-
-gasmaand_l= pd.read_csv('../data/all-consuming-gas-afgelopen-12-maanden.csv')
-gasmaand_l
-
-# +
-#sns.lineplot(gasmaand_l)
-
-# +
-urlhost = "https://api.ned.nl" 
-baseurl = urlhost+"/v1/utilizations"
-url=baseurl
-
-headers = {
- 'X-AUTH-TOKEN': myapikey,
- 'accept': 'application/ld+json'}
-params = {'point': 0, 'type': 2, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
- 'validfrom[strictly_before]': '2024-11-17', 'validfrom[after]': '2024-11-16'}
-response = requests.get(url, headers=headers, params=params, allow_redirects=False)
-
-r2=re.sub( '],"hydra:view.*$',']}',re.sub('.@context.*hydra:member.','"member"',response.text) )
-#print(r2)
-# -
-
-vpf=json.loads(response.text)
-print(vpf)
-
-print (vpf['hydra:member'])
-
-print (pd.json_normalize(vpf['hydra:view']))
-
-#vpd= pd.read_json("{'member':"+vpf['hydra:member']+"}")
-pval=pd.json_normalize(vpf['hydra:member'])
-pval
-
 energytypes=pd.read_csv("../data/energytypes.txt",sep=" ").set_index('index')
 energytypes
 energytypes_dict=energytypes.to_dict()['Energytype']
 energytypes_dict
 
+#sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
+egasyr=pd.read_pickle("../intermediate/egasyr2024.pkl")
+#egasyr.dtypes
+egasyr
 
-# +
-#parameters: zie https://ned.nl/nl/handleiding-api
-#activity 1 Providing,2 Consuming,3 Import, 4 Export
-def getnedvals(params,ptypes,activity):
-    eaders = {
- 'X-AUTH-TOKEN': myapikey,
- 'accept': 'application/ld+json'}
-    rlist=[];
-    for ptype in ptypes:
-        params['type']=ptype
-        params['activity']=activity
-        getmore=True
-        url=baseurl
-        while getmore:
-            response = requests.get(url, headers=headers, params=params, allow_redirects=False)
-            if not response:
-                print (params)
-                raise Exception(f"Non-success status code: {response.status_code}")
-            vpf=json.loads(response.text)
-
-            pval=pd.json_normalize(vpf['hydra:member'])
-            if (pval.columns[0]=='member'):
-                print('No values for ' +str(ptype))
-            else:
-                pval['energytypenr']=ptype
-                pval['energytype']=str(ptype)+ " - "+ energytypes_dict[ptype]
-                rlist.append(pval)
-            pval=pd.concat(rlist)
-            getmore ='hydra:next' in vpf['hydra:view']
-            if getmore:
-#                print (vpf['hydra:view'])
-                getmore = url != vpf['hydra:view']['hydra:last']
-                url= urlhost+vpf['hydra:view']['hydra:next']      
-    for ccol in ['validfrom' , 'validto', 'lastupdate']:
-        pval[ccol]=pd.to_datetime(pval[ccol])
-    return pval
-
-params1= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
- 'validfrom[strictly_before]': '2025-09-15', 'validfrom[after]': '2025-09-01'}
-
-pset1b= getnedvals(params1,[0,1],1)
-# -
-
-pset1= getnedvals(params1,[0,1,2,17,18,19],1)
-
-pset1.dtypes
-
-#vergelijk waarden https://co2monitor.nl/energiebronnen/terugblik# in MW
-pset1kw=pset1.copy()
-pset1kw['volume']=pset1kw['volume']/1000
-sns.scatterplot(data=pset1kw,x="validfrom",y="volume",hue="energytype")
-
-pset2= getnedvals(params1,[23,31,53,54,55,56],2)
-pset2kw=pset2.copy()
-pset2kw['volume']=pset2kw['volume']/1000
-sns.scatterplot(data=pset2kw,x="validfrom",y="volume",hue="energytype")
+maxd="2024-01-16T00:00:00+00:00"
+psett=egasyr[(egasyr['validfrom']< pd.to_datetime(maxd))]
+#psett=egasyr
+pset2=psett[(psett['activity']=='/v1/activities/2')  ]
+pset2
+pset1=psett[(psett['activity']=='/v1/activities/1')  ]
+pset1
 
 
 # +
@@ -177,19 +95,13 @@ pset1t=mkrestcat(pd.concat ( [pset1,pset2]) ,{0:1,23:1},10)
 pset1tkw=pset1t.copy()
 pset1tkw['volume']=pset1tkw['volume']/1000
 sns.scatterplot(data=pset1tkw,x="validfrom",y="volume",hue="energytype")  
-# +
-params1y= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
- 'validfrom[strictly_before]': '2024-12-31', 'validfrom[after]': '2024-01-01'}
+#reconstruct old data subsets
+yset2=egasyr[(egasyr['activity']=='/v1/activities/2')  ]
+yset2
+yset1=egasyr[(egasyr['activity']=='/v1/activities/1')  ]
+yset1
 
-yset1= getnedvals(params1y,[0,1,2,17,18,19],1)
-yset2= getnedvals(params1y,[23,31,53,54,55,56],2)
-# -
-
-#sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
-egasyr=pd.concat ( [yset1,yset2]) 
-egasyr.to_pickle("../intermediate/egasyr2024.pkl")
-
-yset1t=mkrestcat(pd.concat ( [yset1,yset2]) ,{0:1,23:1},10)
+yset1t=mkrestcat(egasyr ,{0:1,23:1},10)
 yset1tkw=yset1t.copy()
 yset1tkw['volume']=yset1tkw['volume']/1000
 sns.scatterplot(data=yset1tkw,x="validfrom",y="volume",hue="energytype") 
@@ -210,12 +122,12 @@ yset7t23['energytypenr']= 26
 yset7t23['energytype']= "26 - Voertuigbrandstoffen"
 yset7t23[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
 
-yset7t0=mkrestcat(pd.concat ( [yset1,yset2,yset7t23]) ,{0:1,23:1,26:1},0)
+yset7t0=mkrestcat(pd.concat ( [egasyr,yset7t23]) ,{0:1,23:1,26:1},0)
 print(yset2t23_2023_sum+ yset7t23_2023_sum+ yset1t0_2023_sum )
 yset7t0[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
 
 genmult=9
-yset8t0=mkrestcat(pd.concat ( [yset1]) ,{1:genmult,2:genmult,17:genmult},1)
+yset8t0=mkrestcat(egasyr ,{1:genmult,2:genmult,17:genmult},1)
 yset8t0[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6/1e6
 
 landyrframe = yset8t0[['volume',"validfrom"]].rename(columns={"volume":"opwek"})
