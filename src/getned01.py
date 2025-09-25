@@ -198,3 +198,11 @@ egasyr=pd.concat ( [yset1,yset2])
 egasyr.to_pickle("../intermediate/egasyr2024.pkl")
 
 
+
+
+
+# +
+#nu opslag model toepassen
+# -
+
+

@@ -27,6 +27,40 @@ import requests
 import json
 import os
 
+# +
+#nu opslag parametriseren, eerst generiek model
+# -
+
+feature_list=['tosto']
+stoex = pd.DataFrame(0.0, index=np.arange(100), columns=feature_list) 
+stoex.at[3,"tosto"]=1
+stoex.plot()
+stoex.dtypes
+
+
+def memfunc(times,initst,halfw,mins,maxs):
+    state=initst
+    decval=1-np.log(2)/halfw
+#    print(decval)
+    a=times.copy()
+    with np.nditer(a, op_flags=['readwrite'], order='K') as it:
+        for x in it:
+            state += x
+            if state > maxs:
+                state=maxs
+            if state < mins:
+                state=mins
+            x[...] =  state
+            state *=decval
+    return a
+stoex['storst1']=memfunc(stoex['tosto'],0.0,40,0,0.5)
+print(stoex['storst1'][43])
+stoex['storst1'].plot()
+
+# +
+#ophalen generieke gegevens
+# -
+
 energytypes=pd.read_csv("../data/energytypes.txt",sep=" ").set_index('index')
 energytypes
 energytypes_dict=energytypes.to_dict()['Energytype']
@@ -141,6 +175,11 @@ landyrframe = landyrframe.merge ( yset7t0[['volume',"validfrom"]].rename(
        columns={"volume":"verbruik"}) ).sort_values("validfrom")
 landyrframe.dtypes
 
+sns.lineplot(data=landyrframe,x="validfrom",y="opwek") 
+sns.lineplot(data=landyrframe,x="validfrom",y="verbruik") 
+plt.title("uurwaarden verbruik en opwek")
+plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
+
 #cumulatieve balans over het jaar, in GWh
 landyrframe ["balans"]= landyrframe ["opwek"]- landyrframe ["verbruik"]
 landyrframe ["cumbalans"]= landyrframe ["balans"].cumsum()
@@ -190,6 +229,7 @@ sns.lineplot(data=balansfreq0,y="totpwr",x="balans")
 #eerste beschrijving van long-term storage: opgeslagen vermogen in GWh
 #gaat uit van snel laden, grote verliezen bij laden en weinig verlies over tijd
 #grafiek mag niet onder 0 uit komen, en moet aan einde royaal hoger dan begin uit komen
+#bij een longstthresh hoger dan 80 raakt de short term overvol in zomer
 nhrslong=4*24
 longsteff=0.4
 longststart=15e3
@@ -200,10 +240,12 @@ landyrframe ["multdaybalans" ]= (landyrframe ["cumbalans" ].shift(-nhrslong)-
 landyrframe ["multdaybalanssm" ]= np.convolve(landyrframe ["multdaybalans" ],
                                               np.ones(nhrslong)/nhrslong,mode='same' )
 landyrframe ["tolongterm" ] = landyrframe ["multdaybalans" ]. where(
-       landyrframe ["multdaybalans" ]<0, landyrframe ["balans" ]. where(
+       landyrframe ["multdaybalans" ]<0,0) + ( landyrframe ["balans" ]. where(
            landyrframe ["balans" ]>longstthresh,0) )
 landyrframe ["longtermst" ] = landyrframe ["tolongterm" ] . where(
       landyrframe ["tolongterm" ]<0,landyrframe ["tolongterm" ] *longsteff) .cumsum() +longststart
+sns.scatterplot(data=landyrframe,x="validfrom",y="tolongterm") 
+
 sns.lineplot(data=landyrframe,x="validfrom",y="longtermst") 
 
 
@@ -222,7 +264,7 @@ balansstats(landyrframe, "tolongterm")
 # -
 
 #dan moet de rest opgevangen door korte termijn
-shortsteff=0.8
+shortsteff=0.9
 shortststart=500
 landyrframe ["toshortterm" ] = landyrframe ["balans" ] -landyrframe ["tolongterm" ]
 landyrframe ["shorttermst" ] = landyrframe ["toshortterm" ] . where(
@@ -230,8 +272,39 @@ landyrframe ["shorttermst" ] = landyrframe ["toshortterm" ] . where(
 sns.lineplot(data=landyrframe,x="validfrom",y="toshortterm") 
 #sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst") 
 
+#opslag zonder halfwaardetijd en maxima
 sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst") 
 
 balansstats(landyrframe, "toshortterm")
+
+# +
+#nu opslag model toepassen
+# -
+
+shortststart=4000
+landyrframe ["shorttermsd" ] = memfunc(landyrframe ["toshortterm" ] . where(
+      landyrframe ["toshortterm" ]<0,landyrframe ["toshortterm" ] *shortsteff) 
+                                       ,shortststart,4*7*24,0,2*shortststart)  
+empty=landyrframe [landyrframe ["shorttermsd" ] ==0 ].copy().reset_index()
+if empty.size !=0:
+    print("WARNING: storage gets empty")
+    print(empty["validfrom"])
+else:    
+    print("OK: storage does not get empty")
+sns.lineplot(data=landyrframe,x="validfrom",y="shorttermsd") 
+plt.title('Short-time storage filling')
+
+#longststart
+landyrframe ["longtermsd" ] = memfunc(landyrframe ["tolongterm" ] . where(
+      landyrframe ["tolongterm" ]<0,landyrframe ["tolongterm" ] *longsteff),
+      longststart,3*365*24,0,4*longststart)  
+empty=landyrframe [landyrframe ["longtermsd" ] ==0 ].copy().reset_index()
+if empty.size !=0:
+    print("WARNING: storage gets empty")
+    print(empty["validfrom"])
+else:    
+    print("OK: storage does not get empty")
+sns.lineplot(data=landyrframe,x="validfrom",y="longtermsd") 
+plt.title('Long-time storage filling')
 
 
