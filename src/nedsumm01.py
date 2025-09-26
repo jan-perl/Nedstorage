@@ -301,7 +301,7 @@ balansfreq0['totpwr']=balansfreq0['balans'].cumsum()
 sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
 
 #keuzes modellen
-glb_inst_long='A'
+glb_inst_long='C'
 glb_inst_short='A'
 inst_str=inst_opw+glb_inst_long+glb_inst_short
 
@@ -312,7 +312,9 @@ inst_str=inst_opw+glb_inst_long+glb_inst_short
 #bij een longstthresh hoger dan 80 raakt de short term overvol in zomer
 some_string="""inst,ndayslong,steff,ststart,stthresh,tfact,athresh,afact,ofact,yrhalf
 A,4,0.4,15e3,80,1,0,0,1.1,2
-B,4,0.4,15e3,0,0,20,0.9,1.1,2"""
+B,4,0.4,15e3,0,0,20,0.9,1.1,2
+C,2,0.4,15e3,0,0,20,0.9,1.1,2
+D,7,0.4,15e3,0,0,20,0.9,1.1,2"""
     #read CSV string into pandas DataFrame    
 param_longdf= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
 
@@ -460,7 +462,7 @@ def add_shortst_mem(df,my_inst_short,my_inst_str):
 add_shortst_mem(landyrframe ,glb_inst_short,inst_str)        
 
 #nu run opnieuw met andere parameters
-glb_inst_long='B'
+glb_inst_long='D'
 glb_inst_short='A'
 inst_str=inst_opw+glb_inst_long+glb_inst_short
 add_longst_io(landyrframe ,glb_inst_long,inst_str)    
