@@ -197,12 +197,19 @@ yset2= getnedvals(params1y,[23,31,53,54,55,56],2)
 egasyr=pd.concat ( [yset1,yset2]) 
 egasyr.to_pickle("../intermediate/egasyr2024.pkl")
 
-
-
-
-
 # +
-#nu opslag model toepassen
+params1y23= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
+ 'validfrom[strictly_before]': '2023-12-31', 'validfrom[after]': '2023-01-01'}
+
+yset231= getnedvals(params1y23,[0,1,2,17,18,19],1)
 # -
+
+yset232= getnedvals(params1y23,[23,31,53,54,55,56],2)
+
+#sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
+egasyr23=pd.concat ( [yset231,yset232]) 
+egasyr23.to_pickle("../intermediate/egasyr2023.pkl")
+
+
 
 

@@ -86,7 +86,8 @@ pset1
 def mkrestcat(df,defs,rtype):
     allcols=set(df.columns)
     summcols=allcols-set(["@id","id","type","volume","capacity","percentage","emission",
-                          "energytype","energytypenr","emissionfactor","lastupdate","activity"])
+                          "energytype","energytypenr","emissionfactor","lastupdate",
+                          "activity"])
     print(summcols)
     dfcalc=df.copy()
     mmap= dfcalc['energytypenr'].map(defs)
@@ -162,23 +163,50 @@ yset7t23['energytypenr']= 26
 yset7t23['energytype']= "26 - Voertuigbrandstoffen"
 yset7t23[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
 
-yset7t0=mkrestcat(pd.concat ( [egasyr,yset7t23]) ,{0:1,23:1,26:1},0)
+gr3usdf=pd.concat ( [egasyr,yset7t23]) 
+gr3usdf=gr3usdf[gr3usdf['energytypenr'].isin ({0,23,26})].copy()
+gr3usdf['energytype']=gr3usdf['energytype'].where(gr3usdf['energytypenr']!=0,'0 - Elektriciteit')
+sns_plot=sns.lineplot(data=gr3usdf,x="validfrom",y="volume",hue='energytype') 
+plt.title("uurwaarden verbruik ")
+plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+figname = "../output/gebrtot3gr2024"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
+
+gr3usdfc=gr3usdf.copy(deep=False)
+gr3usdfc['volcum']=gr3usdfc.groupby(['energytype'])['volume'].cumsum()
+totverbruik = gr3usdfc['volume'].sum()
+title=  ("Opbouw jaarverbruik 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
+    totverbruik,totverbruik/365))
+sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype') 
+plt.title(title)
+plt.ylabel("Cumulatief verbruik (Gwh)")
+plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+figname = "../output/gebrtot3grc2024"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
+
+yset7t0=mkrestcat(gr3usdf,{0:1,23:1,26:1},0)
 print(yset2t23_2023_sum+ yset7t23_2023_sum+ yset1t0_2023_sum )
-yset7t0[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
+yset7t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
 
 genmult=9
 yset8t0=mkrestcat(egasyr ,{1:genmult,2:genmult,17:genmult},1)
-yset8t0[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
+yset8t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
 
 landyrframe = yset8t0[['volume',"validfrom"]].rename(columns={"volume":"opwek"})
 landyrframe = landyrframe.merge ( yset7t0[['volume',"validfrom"]].rename(
-       columns={"volume":"verbruik"}) ).sort_values("validfrom")
+       columns={"volume":"verbruik"}) ).sort_values("validfrom").copy()
 landyrframe.dtypes
 
 sns.lineplot(data=landyrframe,x="validfrom",y="opwek") 
-sns.lineplot(data=landyrframe,x="validfrom",y="verbruik") 
-plt.title("uurwaarden verbruik en opwek")
+sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="verbruik") 
+dagverbruik=landyrframe['verbruik'].sum()/365
+print (dagverbruik)
+plt.title("uurwaarden verbruik 2024 (max= %.0f) en opwek x9 (max= %.0f)"% (
+   landyrframe["verbruik"].max(),landyrframe["opwek"].max()))
 plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
+figname = "../output/eneuthr2024hr"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
 
 #cumulatieve balans over het jaar, in GWh
 landyrframe ["balans"]= landyrframe ["opwek"]- landyrframe ["verbruik"]
@@ -187,8 +215,14 @@ print(landyrframe ["balans"].sum()*3.6)
 sns.lineplot(data=landyrframe,x="validfrom",y="balans") 
 plt.title("uurbalansen: positief is overschot opwek")
 
-sns.lineplot(data=landyrframe,x="validfrom",y="cumbalans") 
-plt.title("cumulatieve uurbalansen")
+sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="cumbalans") 
+lastw=landyrframe.tail(1)["cumbalans"]
+totv=(landyrframe ["verbruik"].sum())
+title= "cumulatieve uurbalansen, overschot = %.0f (= %.1f %% van jaarverbruik)" % (
+     lastw,100*lastw/totv)
+plt.title(title)
+figname = "../output/eneuthr2024c"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
 
 #extra opwek (nodig vanwege opslag verliezen) relatief t.o.v. jaarverbruik
 landyrframe ["cumbalansrel"]= landyrframe ["cumbalans"]/ (landyrframe ["verbruik"].sum())
@@ -244,9 +278,33 @@ landyrframe ["tolongterm" ] = landyrframe ["multdaybalans" ]. where(
            landyrframe ["balans" ]>longstthresh,0) )
 landyrframe ["longtermst" ] = landyrframe ["tolongterm" ] . where(
       landyrframe ["tolongterm" ]<0,landyrframe ["tolongterm" ] *longsteff) .cumsum() +longststart
-sns.scatterplot(data=landyrframe,x="validfrom",y="tolongterm") 
+sns_plot=sns.scatterplot(data=landyrframe,x="validfrom",y="tolongterm") 
+title= 'Long-time storage usage: out smooth %.0f days, in if hour > %0d GW'%(nhrslong/24,longstthresh)
+plt.title(title)
+figname = "../output/longst_io"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
 
 sns.lineplot(data=landyrframe,x="validfrom",y="longtermst") 
+
+#longststart
+landyrframe ["longtermsd" ] = memfunc(landyrframe ["tolongterm" ] . where(
+      landyrframe ["tolongterm" ]<0,landyrframe ["tolongterm" ] *longsteff),
+      longststart,3*365*24,0,4*longststart)  
+empty=landyrframe [landyrframe ["longtermsd" ] ==0 ].copy().reset_index()
+if empty.size !=0:
+    print("WARNING: storage gets empty")
+    print(empty["validfrom"])
+else:    
+    print("OK: storage does not get empty")
+stomax=landyrframe["longtermsd"].max()
+sns.lineplot(data=landyrframe,x="validfrom",y="longtermst",label="cum. balans") 
+sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="longtermsd",label="storage") 
+title= 'Long-time storage filling\n'
+title = title +('storage cycle eff %.0f %% ,half-time 2 yr, max = %.0f initial = %.0f'% (
+    longsteff*100,stomax,longststart))
+plt.title(title)
+figname = "../output/longst_fill"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
 
 
 # +
@@ -256,9 +314,11 @@ def balansstats(df,col):
     balansfreq0['totpwr']=balansfreq0[col].cumsum()
     hrload= (balansfreq0[col] >0).sum()
     hrdis= (balansfreq0[col] <0).sum()
-    tit=(" long term uren laden: %d (%d %%), uren ontladen %d (%d %%)"%(hrload,hrload*(100/(24*365)),hrdis,hrdis*(100/(24*365))))
-    p=sns.lineplot(data=balansfreq0,x="n",y=col) 
+    tit=("%s uren laden: %d (%d %%), uren ontladen %d (%d %%)"%(col,hrload,hrload*(100/(24*365)),hrdis,hrdis*(100/(24*365))))
+    sns_plot=sns.lineplot(data=balansfreq0,x="n",y=col) 
     plt.title(tit)
+    figname = "../output/"+col+"iohrs"+'.png';
+    sns_plot.figure.savefig(figname,dpi=300) 
 
 balansstats(landyrframe, "tolongterm")
 # -
@@ -269,8 +329,12 @@ shortststart=500
 landyrframe ["toshortterm" ] = landyrframe ["balans" ] -landyrframe ["tolongterm" ]
 landyrframe ["shorttermst" ] = landyrframe ["toshortterm" ] . where(
       landyrframe ["toshortterm" ]<0,landyrframe ["toshortterm" ] *shortsteff) .cumsum() +shortststart
-sns.lineplot(data=landyrframe,x="validfrom",y="toshortterm") 
+sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="toshortterm") 
 #sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst") 
+title= 'Short-time storage usage\nLong out smooth %.0f days, in if hour > %0d GW'%(nhrslong/24,longstthresh)
+plt.title(title)
+figname = "../output/shortst_io"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
 
 #opslag zonder halfwaardetijd en maxima
 sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst") 
@@ -291,20 +355,13 @@ if empty.size !=0:
     print(empty["validfrom"])
 else:    
     print("OK: storage does not get empty")
-sns.lineplot(data=landyrframe,x="validfrom",y="shorttermsd") 
-plt.title('Short-time storage filling')
-
-#longststart
-landyrframe ["longtermsd" ] = memfunc(landyrframe ["tolongterm" ] . where(
-      landyrframe ["tolongterm" ]<0,landyrframe ["tolongterm" ] *longsteff),
-      longststart,3*365*24,0,4*longststart)  
-empty=landyrframe [landyrframe ["longtermsd" ] ==0 ].copy().reset_index()
-if empty.size !=0:
-    print("WARNING: storage gets empty")
-    print(empty["validfrom"])
-else:    
-    print("OK: storage does not get empty")
-sns.lineplot(data=landyrframe,x="validfrom",y="longtermsd") 
-plt.title('Long-time storage filling')
+sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="shorttermsd") 
+stomax=landyrframe["shorttermsd"].max()
+title= 'Short-time storage filling\n'
+title = title +('storage cycle eff %.0f %% ,half-time %.0f days, max = %.0f initial = %.0f'% (
+    shortsteff*100,4*7,stomax,shortststart))
+plt.title(title)
+figname = "../output/shortst_fill"+'.png';
+sns_plot.figure.savefig(figname,dpi=300) 
 
 
