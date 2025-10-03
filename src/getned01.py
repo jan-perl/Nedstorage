@@ -26,6 +26,7 @@ import subprocess
 import requests
 import json
 import os
+import time
 
 myapikey = subprocess.getoutput("cat ../data/ned-api.key")
 print(myapikey)
@@ -91,7 +92,9 @@ def getnedvals(params,ptypes,activity):
             vpf=json.loads(response.text)
 
             pval=pd.json_normalize(vpf['hydra:member'])
-            if (pval.columns[0]=='member'):
+            if (pval.size ==0):
+                print('No values for ' +str(ptype))
+            elif (pval.columns[0]=='member'):
                 print('No values for ' +str(ptype))
             else:
                 pval['energytypenr']=ptype
@@ -113,7 +116,8 @@ params1= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'cl
 pset1b= getnedvals(params1,[0,1],1)
 # -
 
-pset1= getnedvals(params1,[0,1,2,17,18,19],1)
+pset1typs=[0,1,2,17,18,19]
+pset1= getnedvals(params1,pset1typs,1)
 
 pset1.dtypes
 
@@ -123,7 +127,8 @@ pset1kw['volume']=pset1kw['volume']/1000
 sns.lineplot(data=pset1kw,x="validfrom",y="volume",hue="energytype")
 plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 
-pset2= getnedvals(params1,[23,31,53,54,55,56],2)
+pset2typs=[23,31,53,54,55,56]
+pset2= getnedvals(params1,pset2typs,2)
 pset2kw=pset2.copy()
 pset2kw['volume']=pset2kw['volume']/1000
 sns.lineplot(data=pset2kw,x="validfrom",y="volume",hue="energytype")
@@ -183,15 +188,20 @@ pset1t=mkrestcat(pd.concat ( [pset1,pset2]) ,{0:1,23:1},10)
 pset1tkw=pset1t.copy()
 pset1tkw['volume']=pset1tkw['volume']/1000
 sns.lineplot(data=pset1tkw,x="validfrom",y="volume",hue="energytype")  
+# +
+#now get full years
 
 # +
 params1y= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
  'validfrom[strictly_before]': '2024-12-31', 'validfrom[after]': '2024-01-01'}
 
-yset1= getnedvals(params1y,[0,1,2,17,18,19],1)
+yset1= getnedvals(params1y,pset1typs,1)
 # -
 
-yset2= getnedvals(params1y,[23,31,53,54,55,56],2)
+#when running full workbook, don't overload server
+time.sleep(360)
+
+yset2= getnedvals(params1y,pset2typs,2)
 
 #sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
 egasyr=pd.concat ( [yset1,yset2]) 
@@ -201,14 +211,35 @@ egasyr.to_pickle("../intermediate/egasyr2024.pkl")
 params1y23= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
  'validfrom[strictly_before]': '2023-12-31', 'validfrom[after]': '2023-01-01'}
 
-yset231= getnedvals(params1y23,[0,1,2,17,18,19],1)
+yset231= getnedvals(params1y23,pset1typs,1)
 # -
 
-yset232= getnedvals(params1y23,[23,31,53,54,55,56],2)
+#when running full workbook, don't overload server
+time.sleep(360)
+
+yset232= getnedvals(params1y23,pset2typs,2)
 
 #sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
 egasyr23=pd.concat ( [yset231,yset232]) 
 egasyr23.to_pickle("../intermediate/egasyr2023.pkl")
+
+time.sleep(360)
+
+# +
+params1y22= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
+ 'validfrom[strictly_before]': '2022-12-31', 'validfrom[after]': '2022-01-01'}
+
+yset221= getnedvals(params1y22,pset1typs,1)
+# -
+
+time.sleep(360)
+
+yset222= getnedvals(params1y22,[23,31],2)
+#for 2022: No values for 53, No values for 54, No values for 55, No values for 56
+
+#sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
+egasyr22=pd.concat ( [yset221,yset222]) 
+egasyr22.to_pickle("../intermediate/egasyr2022.pkl")
 
 
 
