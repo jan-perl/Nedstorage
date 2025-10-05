@@ -219,40 +219,68 @@ sns_plot.figure.savefig(figname,dpi=300)
 
 # +
 #inst_opw bepaalt opwek instelling
-inst_opw='A'
-inst_str=yrtomodel+inst_opw
-ytmult=1
-if yrtomodel=='2023':
-    ytmult=1.1
+glb_inst_opw='A'
+inst_str=yrtomodel+glb_inst_opw
 
 some_string="""inst,windmult,zonrel
 A,9,1
-B,12,0.5"""
+B,12,0.5
+C,6,2.5"""
 #read CSV string into pandas DataFrame
-param_opw= ((pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst'))*ytmult).to_dict('index')[inst_opw]
-print(param_opw)
+param_opw_df= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
+print(param_opw_df)
 
-yset8t0=mkrestcat(egasyr ,{1:param_opw['windmult'],
-                           2:param_opw['windmult'] * param_opw['zonrel'],
-                           17:param_opw['windmult']},1)
-totvol=yset8t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
-print(totvol)
+def get_param_opw(yrstr,inst_opw):
+    ytmult=1
+    if yrstr=='2023':
+        ytmult=1.1
+    param_opw= (param_opw_df*ytmult).to_dict('index')[inst_opw]
+    return(param_opw)
+
+def mkusopw(egasindf,yset7t0df,yrstr,inst_opw):
+    param_opw=get_param_opw(yrstr,inst_opw)
+    print(param_opw)
+
+    yset8t0=mkrestcat(egasindf,{1:param_opw['windmult'],
+                               2:param_opw['windmult'] * param_opw['zonrel'],
+                               17:param_opw['windmult']},1)
+#    totvol=yset8t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
+#    print(totvol)
+    oframe= yset8t0[['volume',"validfrom"]].rename(columns={"volume":"opwek"})
+    cframe = oframe.merge ( yset7t0df[['volume',"validfrom"]].rename(
+           columns={"volume":"verbruik"}) ).sort_values("validfrom").copy()
+    totvol=cframe[['verbruik','opwek']].agg('sum')*3.6
+    print(totvol)
+    return (cframe)
+               
+landyrframe= mkusopw(egasyr,yset7t0,yrtomodel,glb_inst_opw)
+landyrframe.dtypes            
+
+
 # -
 
-landyrframe = yset8t0[['volume',"validfrom"]].rename(columns={"volume":"opwek"})
-landyrframe = landyrframe.merge ( yset7t0[['volume',"validfrom"]].rename(
-       columns={"volume":"verbruik"}) ).sort_values("validfrom").copy()
-landyrframe.dtypes
-
-sns.lineplot(data=landyrframe,x="validfrom",y="opwek") 
-sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="verbruik") 
-dagverbruik=landyrframe['verbruik'].sum()/365
-print (dagverbruik)
-plt.title("uurwaarden verbruik %s (max= %.0f) en opwek x9 (max= %.0f)"% (
-   inst_str,landyrframe["verbruik"].max(),landyrframe["opwek"].max()))
-plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
-figname = "../output/eneuthr_hr_"+inst_str+'.png';
-sns_plot.figure.savefig(figname,dpi=300) 
+def mkovplot(dfin,yrstr,my_inst_opw,my_inst_str):
+    param_opw=get_param_opw(yrstr,my_inst_opw)
+#    print(param_opw)
+    df=dfin.copy(deep=False)
+    sns.lineplot(data=df,x="validfrom",y="opwek") 
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="verbruik") 
+    avgverbruik=df['verbruik'].mean()    
+    ptit=("Verbruik %s (avg = %0.f max= %.0f) en wind * %.1f + zon * %.1f (max= %.0f)"% (
+       inst_str,avgverbruik,df["verbruik"].max(),
+       param_opw['windmult'] ,param_opw['windmult'] * param_opw['zonrel'] , df["opwek"].max()))
+    df['gelijktijdig'] = df['verbruik'].where(df['verbruik'] < df['opwek'],df['opwek'] )
+#    sns.lineplot(data=df,x="validfrom",y="gelijktijdig") 
+    opwekrat=df['opwek'].mean() /avgverbruik    
+    gelijktrat=df['gelijktijdig'].mean() /avgverbruik
+    ptit=ptit+("\ngem dagverbr= %.0f GWh, opwek %0.f %% verbruik, gelijktijdig %0.f %% verbruik %.0f %% opwek)"% (
+       avgverbruik*24, opwekrat*100,gelijktrat*100, gelijktrat*100/opwekrat) )
+    plt.title(ptit)
+    plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
+    plt.xlabel("datum (gegevens per uur)")
+    figname = "../output/eneuthr_hr_"+my_inst_str+'.png';
+    sns_plot.figure.savefig(figname,dpi=300) 
+mkovplot(landyrframe,yrtomodel,glb_inst_opw,inst_str)    
 
 #cumulatieve balans over het jaar, in GWh
 landyrframe ["balans"]= landyrframe ["opwek"]- landyrframe ["verbruik"]
@@ -288,16 +316,16 @@ def balansstats(df,col,totpwr,my_inst_str):
     hrdis= (balansfreq0[col] <0).sum()
     tit=(" long term uren laden: %d (%d %%), uren ontladen %d (%d %%)"%(hrload,hrload*(100/(24*365)),hrdis,hrdis*(100/(24*365))))
     if totpwr:
-        sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
+        p=sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
         plt.xlabel("bij overschotten boven dit vermogen (GW)")
         plt.ylabel("blijft jaarlijks dit over (GWh)")
         figname = "../output/"+col+"iocum_"+my_inst_str+'.png';
-        sns_plot.figure.savefig(figname,dpi=300) 
+        p.figure.savefig(figname,dpi=300) 
     else:
         p=sns.lineplot(data=balansfreq0,x="n",y=col) 
         plt.title(tit)
         figname = "../output/"+col+"iohrs_"+my_inst_str+'.png';
-        sns_plot.figure.savefig(figname,dpi=300) 
+        p.figure.savefig(figname,dpi=300) 
 
 balansstats(landyrframe, "balans",True,inst_str)
 # -
@@ -333,6 +361,7 @@ A,0.9,4000,4,7
 B,0.9,4000,4,7"""
     #read CSV string into pandas DataFrame
 param_shortdf= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
+
 
 # -
 
