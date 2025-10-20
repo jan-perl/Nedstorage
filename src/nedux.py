@@ -28,7 +28,7 @@ import requests
 import json
 import os
 
-from ipywidgets import Dropdown, Button, Output
+from ipywidgets import Dropdown, Button, Output, interact
 from IPython.display import display
 
 # +
@@ -39,25 +39,22 @@ from IPython.display import display
 #using import, 
 import nedsumm01
 
-# !pip install pandas matplotlib ipywidgets
 
-#droplist_l = Dropdown(options=list(nedsumm01.param_longdf['inst'].unique()), description='Long-term:')
-droplist_l = Dropdown(options=nedsumm01.param_longdf.index.values.tolist(), description='Long-term:')
-refresh = Button(description="Refresh", button_style='success')
-output_interact = Output(layout={'border': '1px solid black'}) 
+# +
+# # !pip install pandas matplotlib ipywidgets
+# -
 
-
-@output_interact.capture()
-def on_refresh_champ(x):
-    print (x)
-    output_interact.clear_output()
-    with output_champ:
-        long = droplist_l.value
-        v2=nedsumm01.run_again (nedsumm01.landyrframe.copy(),long,'A')  
-#        widgets.interactive_output(v2)
-
-
-display(droplist_l, refresh, output_interact)
-refresh.on_click(on_refresh_champ)
+def recalc(my2_inst_opw,my2_inst_long,my2_inst_short):
+    nedsumm01.run_again (
+       nedsumm01.landyrframe.copy(),
+       my2_inst_opw,
+       my2_inst_long,
+       my2_inst_short     )
+interact(
+   recalc ,
+       my2_inst_opw=Dropdown(options=nedsumm01.param_opw_df.index.values.tolist(), description='Opwek mix:'),
+       my2_inst_long=Dropdown(options=nedsumm01.param_longdf.index.values.tolist(), description='Long-term:'),
+       my2_inst_short=Dropdown(options=nedsumm01.param_shortdf.index.values.tolist(), description='Short-term:')                   
+)
 
 

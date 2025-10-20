@@ -172,10 +172,10 @@ yset7t23[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
 gr3usdf=pd.concat ( [egasyr,yset7t23]) 
 gr3usdf=gr3usdf[gr3usdf['energytypenr'].isin ({0,23,26})].copy()
 gr3usdf['energytype']=gr3usdf['energytype'].where(gr3usdf['energytypenr']!=0,'0 - Elektriciteit')
-sns_plot=sns.lineplot(data=gr3usdf,x="validfrom",y="volume",hue='energytype') 
+sns_plot=sns.lineplot(data=gr3usdf,x="validfrom",y="volume",hue='energytype',ci=None) 
 plt.title("uurwaarden verbruik ")
 plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
-plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.legend(bbox_to_anchor=(0.99, 0.99), loc=0, borderaxespad=0.)
 figname = "../output/gebrtot3gr2024"+'.png';
 sns_plot.figure.savefig(figname,dpi=300) 
 
@@ -184,10 +184,10 @@ gr3usdfc['volcum']=gr3usdfc.groupby(['energytype'])['volume'].cumsum()
 totverbruik = gr3usdfc['volume'].sum()
 title=  ("Opbouw jaarverbruik 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
     totverbruik,totverbruik/365))
-sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype') 
+sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype',ci=None) 
 plt.title(title)
 plt.ylabel("Cumulatief verbruik (Gwh)")
-plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
 figname = "../output/gebrtot3grc2024"+'.png';
 sns_plot.figure.savefig(figname,dpi=300) 
 
@@ -214,10 +214,10 @@ gr3usdfc['volcum']=gr3usdfc.groupby(['energytype'])['volume'].cumsum()
 totopwek = gr3usdfc['volume'].sum()
 title=  ("Opbouw jaaropwek 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
     totopwek,totopwek/365))
-sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype') 
+sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype',ci=None) 
 plt.title(title)
 plt.ylabel("Cumulatieve opwek (GWh)")
-plt.legend(bbox_to_anchor=(0.05, 1), loc=2, borderaxespad=0.)
+plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
 figname = "../output/opwtot3grc2024"+'.png';
 sns_plot.figure.savefig(figname,dpi=300) 
 
@@ -267,14 +267,14 @@ def mkovplot(dfin,yrstr,my_inst_opw,my_inst_str):
     param_opw=get_param_opw(yrstr,my_inst_opw)
 #    print(param_opw)
     df=dfin.copy(deep=False)
-    sns.lineplot(data=df,x="validfrom",y="opwek") 
-    sns_plot=sns.lineplot(data=df,x="validfrom",y="verbruik") 
+    sns.lineplot(data=df,x="validfrom",y="opwek",ci=None) 
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="verbruik",ci=None) 
     avgverbruik=df['verbruik'].mean()    
     ptit=("Verbruik %s (avg = %0.f max= %.0f) en wind * %.1f + zon * %.1f (max= %.0f)"% (
        inst_str,avgverbruik,df["verbruik"].max(),
        param_opw['windmult'] ,param_opw['windmult'] * param_opw['zonrel'] , df["opwek"].max()))
     df['gelijktijdig'] = df['verbruik'].where(df['verbruik'] < df['opwek'],df['opwek'] )
-#    sns.lineplot(data=df,x="validfrom",y="gelijktijdig") 
+#    sns.lineplot(data=df,x="validfrom",y="gelijktijdig",ci=None) 
     opwekrat=df['opwek'].mean() /avgverbruik    
     gelijktrat=df['gelijktijdig'].mean() /avgverbruik
     ptit=ptit+("\ngem dagverbr= %.0f GWh, opwek %0.f %% verbruik, gelijktijdig %0.f %% verbruik %.0f %% opwek)"% (
@@ -290,10 +290,10 @@ mkovplot(landyrframe,yrtomodel,glb_inst_opw,inst_str)
 landyrframe ["balans"]= landyrframe ["opwek"]- landyrframe ["verbruik"]
 landyrframe ["cumbalans"]= landyrframe ["balans"].cumsum()
 print(landyrframe ["balans"].sum()*3.6)
-sns.lineplot(data=landyrframe,x="validfrom",y="balans") 
+sns.lineplot(data=landyrframe,x="validfrom",y="balans",ci=None) 
 plt.title("uurbalansen: positief is overschot opwek")
 
-sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="cumbalans") 
+sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="cumbalans",ci=None) 
 lastw=landyrframe.tail(1)["cumbalans"]
 totv=(landyrframe ["verbruik"].sum())
 title= "cumulatieve uurbalansen %s, overschot = %.0f (= %.1f %% van jaarverbruik)" % (
@@ -304,7 +304,7 @@ sns_plot.figure.savefig(figname,dpi=300)
 
 #extra opwek (nodig vanwege opslag verliezen) relatief t.o.v. jaarverbruik
 landyrframe ["cumbalansrel"]= landyrframe ["cumbalans"]/ (landyrframe ["verbruik"].sum())
-sns.lineplot(data=landyrframe,x="validfrom",y="cumbalansrel") 
+sns.lineplot(data=landyrframe,x="validfrom",y="cumbalansrel",ci=None) 
 plt.title("cumulatieve uurbalansen als fractie van jaarverbruik")
 
 
@@ -326,13 +326,13 @@ def balansstats(df,col,totpwr,my_inst_str):
         tit=(" %s %s average %.1f, hrs below %.2f : %.0f"%(col,inst_str,avg,avg/10,hrlow))
     plt.clf()
     if totpwr:
-        p=sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
+        p=sns.lineplot(data=balansfreq0,y="totpwr",x="balans",ci=None) 
         plt.xlabel("bij overschotten boven dit vermogen (GW)")
         plt.ylabel("blijft jaarlijks dit over (GWh)")
         figname = "../output/"+col+"iocum_"+my_inst_str+'.png';
         p.figure.savefig(figname,dpi=300) 
     else:
-        p=sns.lineplot(data=balansfreq0,x="n",y=col) 
+        p=sns.lineplot(data=balansfreq0,x="n",y=col,ci=None) 
         plt.title(tit)
         figname = "../output/"+col+"iohrs_"+my_inst_str+'.png';
         p.figure.savefig(figname,dpi=300) 
@@ -346,7 +346,7 @@ balansstats(landyrframe, "balans",True,inst_str)
 balansfreq0=landyrframe [["balans"]].sort_values("balans",ascending=False).copy().reset_index()
 balansfreq0['n']=balansfreq0.index
 balansfreq0['totpwr']=balansfreq0['balans'].cumsum()
-sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
+sns.lineplot(data=balansfreq0,y="totpwr",x="balans",ci=None) 
 
 balansstats(landyrframe, "opwek",False,inst_str)
 
@@ -416,7 +416,7 @@ def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str):
     sns_plot.figure.savefig(figname,dpi=300) 
 add_longst_io(landyrframe ,glb_inst_long,glb_inst_short,inst_str)    
 
-sns.lineplot(data=landyrframe,x="validfrom",y="longtermst") 
+sns.lineplot(data=landyrframe,x="validfrom",y="longtermst",ci=None) 
 
 balansstats(landyrframe, "tolongterm",False,inst_str)
 
@@ -440,12 +440,13 @@ def add_longst_mem(df,my_inst_long,my_inst_str):
         print("OK: storage surplus over year %.0f >%.0f" % (stoend , param_long['ststart']))
     stomax=df["longtermsd"].max()
     plt.clf()
-    sns.lineplot(data=df,x="validfrom",y="longtermst",label="cum. balans") 
-    sns_plot=sns.lineplot(data=df,x="validfrom",y="longtermsd",label="storage") 
+    sns.lineplot(data=df,x="validfrom",y="longtermst",label="cum. balans",ci=None) 
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="longtermsd",label="storage",ci=None) 
     title= 'Long-time storage filling '+my_inst_str
     title = title +('\nstorage cycle eff %.0f %%, half-time %.1f yr\ninitial = %.0f max = %.0f end=%.0f'% (
         param_long['steff']*100,param_long['yrhalf'],param_long['ststart'],stomax,stoend))
     plt.title(title)
+    plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
     figname = "../output/longst_fill_"+my_inst_str+'.png';
     sns_plot.figure.savefig(figname,dpi=300) 
 add_longst_mem(landyrframe ,glb_inst_long,inst_str)        
@@ -461,8 +462,8 @@ def add_shortst_io(df,my_inst_long,my_inst_short,my_inst_str):
     df ["toshortterm" ] = df ["balans" ] -df ["tolongterm" ]
     df ["shorttermst" ] = df ["toshortterm" ] . where(
           df ["toshortterm" ]<0,df ["toshortterm" ] *shortsteff) .cumsum() +shortststart
-    sns_plot=sns.lineplot(data=df,x="validfrom",y="toshortterm") 
-    #sns.lineplot(data=df,x="validfrom",y="shorttermst") 
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="toshortterm",ci=None) 
+    #sns.lineplot(data=df,x="validfrom",y="shorttermst",ci=None) 
     param_long=param_longdf.to_dict('index')[my_inst_long]
     title= 'Short-time storage usage\nLong out smooth %.0f days, in if hour > %0d GW'%(
           param_long['ndayslong'],param_long['stthresh'])
@@ -472,7 +473,7 @@ def add_shortst_io(df,my_inst_long,my_inst_short,my_inst_str):
 add_shortst_io(landyrframe ,glb_inst_long,glb_inst_short,inst_str)    
 
 #opslag zonder halfwaardetijd en maxima
-sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst") 
+sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst",ci=None) 
 
 balansstats(landyrframe, "toshortterm",False,inst_str)
 
@@ -501,7 +502,7 @@ def add_shortst_mem(df,my_inst_short,my_inst_str):
     if (shortstend< shortststart).any()  :
         print("WARNING: storage depleted over year %.0f < %.0f" % (shortstend , shortststart))        
     plt.clf() 
-    sns_plot=sns.lineplot(data=df,x="validfrom",y="shorttermsd") 
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="shorttermsd",ci=None) 
     stomax=df["shorttermsd"].max()
     title= 'Short-time storage filling '+my_inst_str
     title = title +('\nstorage cycle eff %.0f %%, half-time %.0f days\ninitial = %.0f max = %.0f  end = %.0f'% (
@@ -514,14 +515,18 @@ add_shortst_mem(landyrframe ,glb_inst_short,inst_str)
 
 # +
 #nu run opnieuw met andere parameters
-def run_again (cdf, my_inst_long,my_inst_short):
-    my_inst_str=yrtomodel+glb_inst_opw+my_inst_long+my_inst_short
-    
+def run_again (cdf,my_inst_opw, my_inst_long,my_inst_short):
+    my_inst_str=yrtomodel+my_inst_opw
+    landyrframe= mkusopw(egasyr,yset7t0,yrtomodel,my_inst_opw)
+    mkovplot(landyrframe,yrtomodel,my_inst_opw,my_inst_str) 
+    plt.show()
+    my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
     add_longst_io(cdf ,my_inst_long,my_inst_short,my_inst_str)    
     plt.clf()
     balansstats(cdf, "tolongterm",False,my_inst_str)
     plt.clf()
     add_longst_mem(cdf ,my_inst_long,my_inst_str)   
+    plt.show()
     plt.clf()
     add_shortst_io(cdf ,my_inst_long,my_inst_short,my_inst_str)        
     plt.clf()
@@ -529,12 +534,12 @@ def run_again (cdf, my_inst_long,my_inst_short):
     plt.clf()
     add_shortst_mem(cdf ,my_inst_short,my_inst_str) 
     
-run_again (landyrframe.copy(),'D','B')  
+run_again (landyrframe.copy(),glb_inst_opw,'D','B')  
 # -
 
 #regressietest op lang model A voor zo lang short model B zelfde parameters heeft als A
-run_again (landyrframe.copy(),'D','A')  
+run_again (landyrframe.copy(),glb_inst_opw,'D','A')  
 
-run_again (landyrframe.copy(),'C','A')  
+run_again (landyrframe.copy(),glb_inst_opw,'C','A')  
 
 
