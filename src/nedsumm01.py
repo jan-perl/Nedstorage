@@ -67,6 +67,10 @@ energytypes
 energytypes_dict=energytypes.to_dict()['Energytype']
 energytypes_dict
 
+# +
+#ophalen jaargegevens
+# -
+
 yrtomodel='2024'
 
 #haal gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
@@ -105,9 +109,12 @@ def mkrestcat(df,defs,rtype):
     dfcalc['energytype']=str(rtype)+ " - "+ energytypes_dict[rtype]
     return dfcalc
     
+plt.clf()
 #check waarde om verschil te begrijpen
 pset2r=mkrestcat(pset2,{23:1,54:-0.2,55:-1},26)
-sns.scatterplot(data=pd.concat([pset2r,pset2]),x="validfrom",y="volume",hue="energytype")    
+#print(pset2.dtypes)
+#print(pset2.agg('min'))
+sns.scatterplot(data=pd.concat([pset2,pset2]),x="validfrom",y="volume",hue="energytype")    
 # -
 
 pset1r=mkrestcat(pset1,{0:1,1:-1,2:-1,17:-1},10)
@@ -145,17 +152,14 @@ yset1t=mkrestcat(egasyr ,{0:1,23:1},10)
 yset1tkw=yset1t.copy()
 yset1tkw['volume']=yset1tkw['volume']
 sns.scatterplot(data=yset1tkw,x="validfrom",y="volume",hue="energytype") 
-
 yset1t0=yset1[yset1['energytypenr']==0]
 yset1t0_2023_sum=349280
 print(yset1t0['volume'].sum()*3.6)
 yset1[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
-
 yset2t23=yset2[yset2['energytypenr']==23]
 yset2t23_2023_sum=800547
 print(yset2t23['volume'].sum()*3.6)
 yset2[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
-
 #voeg voertuigbrandstoffen toe, in gelijke mate per uur
 #daardoor ontstaat niet-gepiekt (wel planbaar !) verbruik
 yset7t23_2023_sum=432838
@@ -201,7 +205,7 @@ gr3usdf['energytype']=gr3usdf['energytype'].where(gr3usdf['energytypenr']!=0,'0 
 sns_plot=sns.scatterplot(data=gr3usdf,x="validfrom",y="volume",hue='energytype') 
 plt.title("uurwaarden opwek ")
 plt.ylabel("Uurvermogen (GW) of (GWh/hr)")
-plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.legend(bbox_to_anchor=(0.75, 1), loc=2, borderaxespad=0.)
 figname = "../output/opwtot3gr2024"+'.png';
 sns_plot.figure.savefig(figname,dpi=300) 
 
@@ -213,7 +217,7 @@ title=  ("Opbouw jaaropwek 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
 sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype') 
 plt.title(title)
 plt.ylabel("Cumulatieve opwek (GWh)")
-plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+plt.legend(bbox_to_anchor=(0.05, 1), loc=2, borderaxespad=0.)
 figname = "../output/opwtot3grc2024"+'.png';
 sns_plot.figure.savefig(figname,dpi=300) 
 
@@ -309,12 +313,18 @@ plt.title("cumulatieve uurbalansen als fractie van jaarverbruik")
 #als je opslag laadt vanaf een bepaalde grens (GW , of GWh/uur), hoe veel 
 #totaal niet direct verbruikt vermogen (GWh) is dan per jaar beschikbaar ?
 def balansstats(df,col,totpwr,my_inst_str):
-    balansfreq0=landyrframe [[col]].sort_values(col,ascending=False).copy().reset_index()
+    balansfreq0=df[[col]].sort_values(col,ascending=False).copy().reset_index()
     balansfreq0['n']=balansfreq0.index
     balansfreq0['totpwr']=balansfreq0[col].cumsum()
     hrload= (balansfreq0[col] >0).sum()
     hrdis= (balansfreq0[col] <0).sum()
-    tit=(" long term uren laden: %d (%d %%), uren ontladen %d (%d %%)"%(hrload,hrload*(100/(24*365)),hrdis,hrdis*(100/(24*365))))
+    if my_inst_str == 'balans':
+        tit=(" long term uren laden: %d (%d %%), uren ontladen %d (%d %%)"%(hrload,hrload*(100/(24*365)),hrdis,hrdis*(100/(24*365))))
+    else:
+        avg= balansfreq0[col].mean()
+        hrlow= (balansfreq0[col] < avg/10).sum()
+        tit=(" %s %s average %.1f, hrs below %.2f : %.0f"%(col,inst_str,avg,avg/10,hrlow))
+    plt.clf()
     if totpwr:
         p=sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
         plt.xlabel("bij overschotten boven dit vermogen (GW)")
@@ -338,10 +348,12 @@ balansfreq0['n']=balansfreq0.index
 balansfreq0['totpwr']=balansfreq0['balans'].cumsum()
 sns.lineplot(data=balansfreq0,y="totpwr",x="balans") 
 
+balansstats(landyrframe, "opwek",False,inst_str)
+
 #keuzes modellen
 glb_inst_long='A'
 glb_inst_short='A'
-inst_str=yrtomodel+inst_opw+glb_inst_long+glb_inst_short
+inst_str=yrtomodel+glb_inst_opw+glb_inst_long+glb_inst_short
 
 # +
 #eerste beschrijving van long-term storage: opgeslagen vermogen in GWh
@@ -394,6 +406,7 @@ def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str):
     df ["longtermst" ] = df ["tolongterm" ] . where(
           df ["tolongterm" ]<0,df ["tolongterm" ] *param_long['steff']
            ) .cumsum() +param_long['ststart']
+    plt.clf()
     sns_plot=sns.scatterplot(data=df,x="validfrom",y="tolongterm") 
     title= 'Long-time storage in/out %s: out smooth %.0f days, need * %.2f\n in if hour > %0d GW  %.2f + smooth in > %.0d GW * %.2f'%(
         my_inst_str,param_long['ndayslong'],param_long['ofact'],param_long['stthresh'],param_long['tfact'],
@@ -426,6 +439,7 @@ def add_longst_mem(df,my_inst_long,my_inst_str):
     else:        
         print("OK: storage surplus over year %.0f >%.0f" % (stoend , param_long['ststart']))
     stomax=df["longtermsd"].max()
+    plt.clf()
     sns.lineplot(data=df,x="validfrom",y="longtermst",label="cum. balans") 
     sns_plot=sns.lineplot(data=df,x="validfrom",y="longtermsd",label="storage") 
     title= 'Long-time storage filling '+my_inst_str
@@ -486,7 +500,7 @@ def add_shortst_mem(df,my_inst_short,my_inst_str):
     shortstend=  df.tail(1)["shorttermsd"] 
     if (shortstend< shortststart).any()  :
         print("WARNING: storage depleted over year %.0f < %.0f" % (shortstend , shortststart))        
-
+    plt.clf() 
     sns_plot=sns.lineplot(data=df,x="validfrom",y="shorttermsd") 
     stomax=df["shorttermsd"].max()
     title= 'Short-time storage filling '+my_inst_str
@@ -501,7 +515,7 @@ add_shortst_mem(landyrframe ,glb_inst_short,inst_str)
 # +
 #nu run opnieuw met andere parameters
 def run_again (cdf, my_inst_long,my_inst_short):
-    my_inst_str=yrtomodel+inst_opw+my_inst_long+my_inst_short
+    my_inst_str=yrtomodel+glb_inst_opw+my_inst_long+my_inst_short
     
     add_longst_io(cdf ,my_inst_long,my_inst_short,my_inst_str)    
     plt.clf()
