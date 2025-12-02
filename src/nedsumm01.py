@@ -28,6 +28,9 @@ import requests
 import json
 import os
 
+from ipywidgets import Dropdown, Button, Output, interact
+from IPython.display import display
+
 # +
 #nu opslag parametriseren, eerst generiek model
 # -
@@ -67,26 +70,42 @@ energytypes
 energytypes_dict=energytypes.to_dict()['Energytype']
 energytypes_dict
 
+#referentie gegevens in TJ
+regklimmon23_map={0: 349280, 23: 800547, 26: 432838}
+
 # +
 #ophalen jaargegevens
 # -
 
 yrtomodel='2024'
 
+
 #haal gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
-egasyr=pd.read_pickle("../intermediate/egasyr"+yrtomodel+".pkl")
-#egasyr.dtypes
-#en doe berekeningen in GWh, en niet in kWh
-egasyr['volume']=egasyr['volume']*1e-6
+def getyrdta(my_yrtomodel):
+    egasyr=pd.read_pickle("../intermediate/egasyr"+yrtomodel+".pkl")
+    #egasyr.dtypes
+    #en doe berekeningen in GWh, en niet in kWh
+    egasyr['volume']=egasyr['volume']*1e-6
+    return( egasyr)
+egasyr= getyrdta(yrtomodel)    
 egasyr
 
+#maak kleine sets om de eerste paar dagen mee te plotten
 maxd=yrtomodel+"-01-16T00:00:00+00:00"
 psett=egasyr[(egasyr['validfrom']< pd.to_datetime(maxd))]
+#maar gebruik nu hele jaar
 psett=egasyr
 pset2=psett[(psett['activity']=='/v1/activities/2')  ]
 pset2
 pset1=psett[(psett['activity']=='/v1/activities/1')  ]
 pset1
+
+#hieruit kan e.v.t worden geprobeerd de 25 % missend gasverbruik te reconstrueren
+gassums= pset2.groupby(["energytype","energytypenr"])['volume'].agg('sum')*3.6/ regklimmon23_map[23]
+print (gassums)
+dv=gassums.reset_index('energytype')['volume'].to_dict()
+print(dv[23]+dv[31])
+print(dv[53]+dv[54]+dv[55])
 
 
 # +
@@ -114,7 +133,7 @@ plt.clf()
 pset2r=mkrestcat(pset2,{23:1,54:-0.2,55:-1},26)
 #print(pset2.dtypes)
 #print(pset2.agg('min'))
-sns.scatterplot(data=pd.concat([pset2,pset2]),x="validfrom",y="volume",hue="energytype")    
+sns.scatterplot(data=pd.concat([pset2r,pset2]),x="validfrom",y="volume",hue="energytype")    
 # -
 
 pset1r=mkrestcat(pset1,{0:1,1:-1,2:-1,17:-1},10)
@@ -122,123 +141,111 @@ pset1r=mkrestcat(pset1,{0:1,1:-1,2:-1,17:-1},10)
 #waarde om rest opwek te begrijpen
 sns.scatterplot(data=pd.concat([pset1r,pset1]),x="validfrom",y="volume",hue="energytype")  
 
-if False:
-    params3= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 3,
- 'validfrom[strictly_before]': '2025-09-15', 'validfrom[after]': '2025-09-01'}
-
-    pset3= getnedvals(params3,[0,23],3)
-    pset3kw=pset3.copy()
-    pset3kw['volume']=pset3kw['volume']/1000
-    sns.scatterplot(data=pset3kw,x="validfrom",y="volume",hue="energytype")
-
-if False:
-    params4= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 4,
-     'validfrom[strictly_before]': '2025-09-15', 'validfrom[after]': '2025-09-01'}
-
-    pset4= getnedvals(params4,[0,23],3)
-    pset4kw=pset4.copy()
-    pset4kw['volume']=pset4kw['volume']/1000
-    sns.scatterplot(data=pset4kw,x="validfrom",y="volume",hue="energytype")
+#maak plot eerste dagen
 pset1t=mkrestcat(pd.concat ( [pset1,pset2]) ,{0:1,23:1},10)
 pset1tkw=pset1t.copy()
 pset1tkw['volume']=pset1tkw['volume']
 sns.scatterplot(data=pset1tkw,x="validfrom",y="volume",hue="energytype")  
-#reconstruct old data subsets
-yset2=egasyr[(egasyr['activity']=='/v1/activities/2')  ]
-yset2
-yset1=egasyr[(egasyr['activity']=='/v1/activities/1')  ]
-yset1
-yset1t=mkrestcat(egasyr ,{0:1,23:1},10)
-yset1tkw=yset1t.copy()
-yset1tkw['volume']=yset1tkw['volume']
-sns.scatterplot(data=yset1tkw,x="validfrom",y="volume",hue="energytype") 
-yset1t0=yset1[yset1['energytypenr']==0]
-yset1t0_2023_sum=349280
-print(yset1t0['volume'].sum()*3.6)
-yset1[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
-yset2t23=yset2[yset2['energytypenr']==23]
-yset2t23_2023_sum=800547
-print(yset2t23['volume'].sum()*3.6)
-yset2[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
-#voeg voertuigbrandstoffen toe, in gelijke mate per uur
-#daardoor ontstaat niet-gepiekt (wel planbaar !) verbruik
-yset7t23_2023_sum=432838
-yset7t23=yset2t23.copy()
-yset7t23['volume']= yset7t23_2023_sum/3.6/(24*365)
-yset7t23['energytypenr']= 26
-yset7t23['energytype']= "26 - Voertuigbrandstoffen"
-yset7t23[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6
 
-gr3usdf=pd.concat ( [egasyr,yset7t23]) 
-gr3usdf=gr3usdf[gr3usdf['energytypenr'].isin ({0,23,26})].copy()
-gr3usdf['energytype']=gr3usdf['energytype'].where(gr3usdf['energytypenr']!=0,'0 - Elektriciteit')
-sns_plot=sns.lineplot(data=gr3usdf,x="validfrom",y="volume",hue='energytype',ci=None) 
-plt.title("uurwaarden verbruik ")
-plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
-plt.legend(bbox_to_anchor=(0.99, 0.99), loc=0, borderaxespad=0.)
-figname = "../output/gebrtot3gr2024"+'.png';
-sns_plot.figure.savefig(figname,dpi=300) 
+some_string="""inst,vbfact,vbverd,omschr
+A,1,0,data + voertuig glad"""
+#read CSV string into pandas DataFrame
+param_verbr_df= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
+print(param_verbr_df)
 
-gr3usdfc=gr3usdf.copy(deep=False)
-gr3usdfc['volcum']=gr3usdfc.groupby(['energytype'])['volume'].cumsum()
-totverbruik = gr3usdfc['volume'].sum()
-title=  ("Opbouw jaarverbruik 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
-    totverbruik,totverbruik/365))
-sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype',ci=None) 
-plt.title(title)
-plt.ylabel("Cumulatief verbruik (Gwh)")
-plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
-figname = "../output/gebrtot3grc2024"+'.png';
-sns_plot.figure.savefig(figname,dpi=300) 
 
+# +
+def mkcombiset(yrindat):
+    yset2=yrindat[(yrindat['activity']=='/v1/activities/2')  ]
+#    yset2
+    yset1=yrindat[(yrindat['activity']=='/v1/activities/1')  ]
+#    yset1
+    
+
+    yset1t=mkrestcat(yrindat ,{0:1,23:1},10)
+    yset1tkw=yset1t.copy()
+    yset1tkw['volume']=yset1tkw['volume']
+    sns.scatterplot(data=yset1tkw,x="validfrom",y="volume",hue="energytype") 
+    yset1t0=yset1[yset1['energytypenr']==0]
+
+    yset2t23=yset2[yset2['energytypenr']==23]
+    #voeg voertuigbrandstoffen toe, in gelijke mate per uur
+    #daardoor ontstaat niet-gepiekt (wel planbaar !) verbruik
+    yset7t23_2023_sum=regklimmon23_map[26]
+    yset7t23=yset2t23.copy()
+    yset7t23['volume']= yset7t23_2023_sum/3.6/(24*365)
+    yset7t23['energytypenr']= 26
+    yset7t23['energytype']= "26 - Voertuigbrandstoffen"
+    gr3iusdf= pd.concat ( [yrindat,yset7t23]) 
+    gr3iusdf=gr3iusdf[gr3iusdf['energytypenr'].isin ({0,23,26})].copy()
+    gr3iusdf['energytype']=gr3iusdf['energytype'].where(gr3iusdf['energytypenr']!=0,'0 - Elektriciteit')
+    v3=(gr3iusdf[['volume','energytypenr']].groupby('energytypenr').agg('sum')*3.6 ).reset_index()
+    v3['regklimmon23_TJ'] = v3['energytypenr'].map(regklimmon23_map)
+    v3['regklimmon23rat'] = v3['volume']/ v3['regklimmon23_TJ'] 
+    print(v3)
+    return (gr3iusdf)
+
+gr3usdf=mkcombiset(egasyr)
+
+
+# -
+def mkuurpl3gr(df,gtype,grprfx,my_yrtomodel,labpl):
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="volume",hue='energytype',ci=None) 
+    plt.title("uurwaarden "+gtype+my_yrtomodel)
+    plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
+    plt.legend(bbox_to_anchor=(labpl, 0.99), loc=0, borderaxespad=0.)
+    figname = "../output/"+grprfx+"tot3gr"+my_yrtomodel+'.png';
+    sns_plot.figure.savefig(figname,dpi=300) 
+mkuurpl3gr(gr3usdf,"verbruik ",'gebr',yrtomodel,0.3)
+
+
+def mkuurpl3grc(df,gtype,grprfx,my_yrtomodel):
+    gr3usdfc=df.copy(deep=False)
+    gr3usdfc['volcum']=gr3usdfc.groupby(['energytype'])['volume'].cumsum()
+    totverbruik = gr3usdfc['volume'].sum()
+    title=  ("Opbouw %s%s: 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
+        gtype,my_yrtomodel,totverbruik,totverbruik/365))
+    sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype',ci=None) 
+    plt.title(title)
+    plt.ylabel("Cumulatief verbruik (Gwh)")
+    plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
+    figname = "../output/"+grprfx+"tot3grc"+my_yrtomodel+'.png';
+    sns_plot.figure.savefig(figname,dpi=300) 
+mkuurpl3grc(gr3usdf,"verbruik ",'gebr',yrtomodel)    
+
+#bereken totaal verbruik, voor verder model
 yset7t0=mkrestcat(gr3usdf,{0:1,23:1,26:1},0)
-print(yset2t23_2023_sum+ yset7t23_2023_sum+ yset1t0_2023_sum )
+#print(yset2t23_2023_sum+ yset7t23_2023_sum+ yset1t0_2023_sum )
 yset7t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
 
 # +
 #nu zelfde excercitie voor opwek
 # -
 
-gr3usdf=egasyr
-gr3usdf=gr3usdf[gr3usdf['energytypenr'].isin ({1,2,17})].copy()
-gr3usdf['energytype']=gr3usdf['energytype'].where(gr3usdf['energytypenr']!=0,'0 - Elektriciteit')
-sns_plot=sns.scatterplot(data=gr3usdf,x="validfrom",y="volume",hue='energytype') 
-plt.title("uurwaarden opwek ")
-plt.ylabel("Uurvermogen (GW) of (GWh/hr)")
-plt.legend(bbox_to_anchor=(0.75, 1), loc=2, borderaxespad=0.)
-figname = "../output/opwtot3gr2024"+'.png';
-sns_plot.figure.savefig(figname,dpi=300) 
+mkuurpl3gr(egasyr[egasyr['energytypenr'].isin ({1,2,17})].copy(),"opwek ",'opw',yrtomodel,0.8)
 
-gr3usdfc=gr3usdf.copy(deep=False)
-gr3usdfc['volcum']=gr3usdfc.groupby(['energytype'])['volume'].cumsum()
-totopwek = gr3usdfc['volume'].sum()
-title=  ("Opbouw jaaropwek 3 groepen\n totaal %.0f GWh /jaar, %.0f GWh /dag" %(
-    totopwek,totopwek/365))
-sns_plot= sns.lineplot(data=gr3usdfc,x="validfrom",y="volcum",hue='energytype',ci=None) 
-plt.title(title)
-plt.ylabel("Cumulatieve opwek (GWh)")
-plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
-figname = "../output/opwtot3grc2024"+'.png';
-sns_plot.figure.savefig(figname,dpi=300) 
+mkuurpl3grc(egasyr[egasyr['energytypenr'].isin ({1,2,17})].copy(),"opwek ",'opw',yrtomodel)
 
 # +
 #inst_opw bepaalt opwek instelling
-glb_inst_opw='A'
+glb_inst_opw='D'
 inst_str=yrtomodel+glb_inst_opw
 
-some_string="""inst,windmult,zonrel
-A,9,1
-B,12,0.5
-C,6,2.5"""
+some_string="""inst,windmult,zonrel,omschr
+A,9.0,1,evenredig zon-wind
+B,12,0.5,meer wind
+C,6,2.5,meer zon
+D,7,1,energieneutraal+6%"""
 #read CSV string into pandas DataFrame
 param_opw_df= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
 print(param_opw_df)
 
 def get_param_opw(yrstr,inst_opw):
+    param_opw = param_opw_df.to_dict('index')[inst_opw]
     ytmult=1
     if yrstr=='2023':
         ytmult=1.1
-    param_opw= (param_opw_df*ytmult).to_dict('index')[inst_opw]
+    param_opw['windmult']= (param_opw['windmult']*ytmult)
     return(param_opw)
 
 def mkusopw(egasindf,yset7t0df,yrstr,inst_opw):
@@ -251,9 +258,14 @@ def mkusopw(egasindf,yset7t0df,yrstr,inst_opw):
 #    totvol=yset8t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
 #    print(totvol)
     oframe= yset8t0[['volume',"validfrom"]].rename(columns={"volume":"opwek"})
-    cframe = oframe.merge ( yset7t0df[['volume',"validfrom"]].rename(
-           columns={"volume":"verbruik"}) ).sort_values("validfrom").copy()
-    totvol=cframe[['verbruik','opwek']].agg('sum')*3.6
+    voorwarmte = egasindf[egasindf['energytypenr'].isin ({23})] . rename(columns={"volume":"warmtevbr"})
+    voorwarmte ["warmtevbr"]=  voorwarmte ["warmtevbr"] - (0.5*voorwarmte ["warmtevbr"].min())                      
+    tframe = oframe.merge ( voorwarmte[['warmtevbr',"validfrom"]])
+    cframe = tframe.merge ( yset7t0df[['volume',"validfrom"]].rename(
+           columns={"volume":"verbruik"}) ).sort_values("validfrom").copy()    
+    cframe ["balans"]= cframe ["opwek"]- cframe ["verbruik"]
+    cframe ["cumbalans"]= cframe ["balans"].cumsum()
+    totvol=cframe[['verbruik','opwek','balans','warmtevbr']].agg('sum')*3.6
     print(totvol)
     return (cframe)
                
@@ -267,8 +279,8 @@ def mkovplot(dfin,yrstr,my_inst_opw,my_inst_str):
     param_opw=get_param_opw(yrstr,my_inst_opw)
 #    print(param_opw)
     df=dfin.copy(deep=False)
-    sns.lineplot(data=df,x="validfrom",y="opwek",ci=None) 
-    sns_plot=sns.lineplot(data=df,x="validfrom",y="verbruik",ci=None) 
+    sns.lineplot(data=df,x="validfrom",y="opwek",ci=None,label='opwek') 
+    sns_plot=sns.lineplot(data=df,x="validfrom",y="verbruik",ci=None,label='verbruik')  
     avgverbruik=df['verbruik'].mean()    
     ptit=("Verbruik %s (avg = %0.f max= %.0f) en wind * %.1f + zon * %.1f (max= %.0f)"% (
        inst_str,avgverbruik,df["verbruik"].max(),
@@ -280,32 +292,36 @@ def mkovplot(dfin,yrstr,my_inst_opw,my_inst_str):
     ptit=ptit+("\ngem dagverbr= %.0f GWh, opwek %0.f %% verbruik, gelijktijdig %0.f %% verbruik %.0f %% opwek)"% (
        avgverbruik*24, opwekrat*100,gelijktrat*100, gelijktrat*100/opwekrat) )
     plt.title(ptit)
+    plt.legend(bbox_to_anchor=(0.75, 0.99), loc=0, borderaxespad=0.)
     plt.ylabel("Uurvermogen (GW) of (Gwh/hr)")
     plt.xlabel("datum (gegevens per uur)")
     figname = "../output/eneuthr_hr_"+my_inst_str+'.png';
     sns_plot.figure.savefig(figname,dpi=300) 
 mkovplot(landyrframe,yrtomodel,glb_inst_opw,inst_str)    
 
-#cumulatieve balans over het jaar, in GWh
-landyrframe ["balans"]= landyrframe ["opwek"]- landyrframe ["verbruik"]
-landyrframe ["cumbalans"]= landyrframe ["balans"].cumsum()
-print(landyrframe ["balans"].sum()*3.6)
+# balans over het jaar, in GWh
 sns.lineplot(data=landyrframe,x="validfrom",y="balans",ci=None) 
 plt.title("uurbalansen: positief is overschot opwek")
 
-sns_plot=sns.lineplot(data=landyrframe,x="validfrom",y="cumbalans",ci=None) 
-lastw=landyrframe.tail(1)["cumbalans"]
-totv=(landyrframe ["verbruik"].sum())
-title= "cumulatieve uurbalansen %s, overschot = %.0f (= %.1f %% van jaarverbruik)" % (
-     inst_str,lastw,100*lastw/totv)
-plt.title(title)
-figname = "../output/eneuthr_cum_"+inst_str+'.png';
-sns_plot.figure.savefig(figname,dpi=300) 
+
+def cumbalplot(cframe,my_inst_str):
+    sns_plot=sns.lineplot(data=cframe,x="validfrom",y="cumbalans",ci=None) 
+    lastw=cframe.tail(1)["cumbalans"]
+    totv=(cframe ["verbruik"].sum())
+    title= "cumulatieve uurbalansen %s, overschot = %.0f (= %.1f %% van jaarverbruik)" % (
+         inst_str,lastw,100*lastw/totv)
+    plt.title(title)
+    figname = "../output/eneuthr_cum_"+inst_str+'.png';
+    sns_plot.figure.savefig(figname,dpi=300) 
+cumbalplot(landyrframe,inst_str)    
+
 
 #extra opwek (nodig vanwege opslag verliezen) relatief t.o.v. jaarverbruik
-landyrframe ["cumbalansrel"]= landyrframe ["cumbalans"]/ (landyrframe ["verbruik"].sum())
-sns.lineplot(data=landyrframe,x="validfrom",y="cumbalansrel",ci=None) 
-plt.title("cumulatieve uurbalansen als fractie van jaarverbruik")
+def plotreovsch(cframe):
+    cframe ["cumbalansrel"]= cframe["cumbalans"]/ (cframe ["verbruik"].sum())
+    sns.lineplot(data=cframe,x="validfrom",y="cumbalansrel",ci=None) 
+    plt.title("cumulatieve uurbalansen als fractie van jaarverbruik")
+plotreovsch(landyrframe.copy(deep=False))    
 
 
 # +
@@ -360,17 +376,18 @@ inst_str=yrtomodel+glb_inst_opw+glb_inst_long+glb_inst_short
 #gaat uit van snel laden, grote verliezen bij laden en weinig verlies over tijd
 #grafiek mag niet onder 0 uit komen, en moet aan einde royaal hoger dan begin uit komen
 #bij een longstthresh hoger dan 80 raakt de short term overvol in zomer
-some_string="""inst,ndayslong,steff,ststart,stthresh,tfact,athresh,afact,ofact,yrhalf
-A,4,0.4,30e3,70,1,0,0,1.01,2
-B,4,0.4,30e3,0,0,15,0.9,1.01,2
-C,2,0.4,30e3,0,0,3,0.95,1.01,2
-D,7,0.4,30e3,0,0,15,0.9,1.01,2"""
+some_string="""inst,ndayslong,steff,ststart,stthresh,tfact,athresh,afact,ofact,yrhalf,omschr
+A,4,0.4,30e3,0,0,15,0.9,1.01,2,4 dgn geleidelijke opslag
+B,4,0.4,30e3,70,1,0,0,1.01,2,4 dgn alleen piek opslag
+C,2,0.4,30e3,0,0,3,0.95,1.01,2,2 dgn geleidelijke opslag
+D,7,0.4,30e3,0,0,15,0.9,1.01,2,7 dgn geleidelijke opslag
+E,2,3.0,60e3,0,0,15,0.9,1.01,2,2 dgn warmte eff"""
     #read CSV string into pandas DataFrame    
 param_longdf= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
 
-some_string="""inst,steff,ststart,wkhalf,dayscap
-A,0.9,4000,4,7
-B,0.9,4000,4,7"""
+some_string="""inst,steff,ststart,wkhalf,dayscap,omschr
+A,0.9,4000,4,7,4 dgn cap
+B,0.9,4000,4,7,kopie van A"""
     #read CSV string into pandas DataFrame
 param_shortdf= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
 
@@ -391,7 +408,7 @@ def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str):
     shortststart=param_short['ststart']
     shorthalfw=param_short['wkhalf']*7*24
     avgshusg = shortststart * (np.log(2)/shorthalfw) / shortsteff
-    
+    #voeg gemiddelde verliezen korte termijn toe aan balans
     balans1= df ["balans" ] - avgshusg 
     repyr=pd.concat ( [ balans1, balans1[0:nhrslong]  ] ).cumsum()
     bcalc= ( repyr.shift(-nhrslong)- repyr)/nhrslong
@@ -411,6 +428,7 @@ def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str):
     title= 'Long-time storage in/out %s: out smooth %.0f days, need * %.2f\n in if hour > %0d GW  %.2f + smooth in > %.0d GW * %.2f'%(
         my_inst_str,param_long['ndayslong'],param_long['ofact'],param_long['stthresh'],param_long['tfact'],
            param_long['athresh'],param_long['afact'])
+    plt.ylabel("Uurbalans (GW of GWh)")
     plt.title(title)
     figname = "../output/longst_io_"+my_inst_str+'.png';
     sns_plot.figure.savefig(figname,dpi=300) 
@@ -446,11 +464,52 @@ def add_longst_mem(df,my_inst_long,my_inst_str):
     title = title +('\nstorage cycle eff %.0f %%, half-time %.1f yr\ninitial = %.0f max = %.0f end=%.0f'% (
         param_long['steff']*100,param_long['yrhalf'],param_long['ststart'],stomax,stoend))
     plt.title(title)
+    plt.ylabel("Opslag vulling (GWh)")
     plt.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
     figname = "../output/longst_fill_"+my_inst_str+'.png';
     sns_plot.figure.savefig(figname,dpi=300) 
 add_longst_mem(landyrframe ,glb_inst_long,inst_str)        
 
+
+# +
+### deel lange termijn opname voor warmte
+def calclong_warmfrac(dfin,my_inst_long,my_inst_short,my_inst_str):
+    df=dfin.copy()
+    param_long=param_longdf.to_dict('index')[my_inst_long]
+    print(param_long)
+    nhrslong=24*param_long['ndayslong']
+    balans1= df ["warmtevbr" ] 
+    repyr=pd.concat ( [ balans1, balans1[0:nhrslong]  ] ).cumsum()
+    bcalc= ( repyr.shift(-nhrslong)- repyr)/nhrslong
+    df ["multdaywarmtevbr" ]= bcalc[0:len(df.index)]
+    df ["multdaywarmtevbrsm" ]= np.convolve(df ["multdaywarmtevbr" ],
+                                             np.ones(nhrslong)/nhrslong,mode='same' )
+    df ["fromlongterm"] = - df ["tolongterm"].where(df ["tolongterm"]<0,0)
+#    df ["longtermnaarwarmte"] = df ["multdaywarmtevbrsm" ]/ df ["fromlongterm"] 
+    df ["longtermnaarwarmte"] = df ["fromlongterm"].where (df ["fromlongterm"]< df ["multdaywarmtevbrsm" ], 
+                                                           df ["multdaywarmtevbrsm" ])
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+    sns.scatterplot(data=df, x="validfrom",y= "fromlongterm",label="Totaal uit long",ax=ax1 )
+    sns.scatterplot(data=df, x="validfrom",y= "longtermnaarwarmte" ,label="Als warmte uit long",ax=ax1)
+    # Create and plotting the secondary y-axis data
+    ax2 = ax1.twinx()
+    df ["fromlongtermc"] =df ["fromlongterm"] .cumsum()
+    df ["longtermnaarwarmtec"] =df ["longtermnaarwarmte"] .cumsum()
+    sns.lineplot(data=df, x="validfrom",y= "fromlongtermc" ,label="Totaal uit long",ax=ax2,ci=None)
+    sns.lineplot(data=df, x="validfrom",y= "longtermnaarwarmtec" ,label="Als warmte uit long",ax=ax2,ci=None)
+    # Set labels with matching colors
+    ax1.set_ylabel('Vermogen (GW/ GWh/hr)')
+    ax2.set_ylabel('Cumulatieve energie (GWh)')
+    ax1.legend( loc='upper left')
+    ax2.legend( loc='upper center')
+#    sns.scatterplot(data=df, x="validfrom",y= "longtermnaarwarmte" )
+    
+calclong_warmfrac(landyrframe ,glb_inst_long,glb_inst_short,inst_str)
+
+
+# +
+### Korte termijn
+# -
 
 #dan moet de rest opgevangen door korte termijn
 def add_shortst_io(df,my_inst_long,my_inst_short,my_inst_str):
@@ -487,6 +546,8 @@ def add_shortst_mem(df,my_inst_short,my_inst_str):
     shortsteff=param_short['steff']
     shortststart=param_short['ststart']
 
+    totverbruik = df['verbruik'].sum()
+    #print('totverbruik %.1f'%(totverbruik))
     shortmaxsto=totverbruik*param_short['dayscap']/365
     shorthalfw=param_short['wkhalf']*7*24
     df ["shorttermsd" ] = memfunc(df ["toshortterm" ] . where(
@@ -507,6 +568,7 @@ def add_shortst_mem(df,my_inst_short,my_inst_str):
     title= 'Short-time storage filling '+my_inst_str
     title = title +('\nstorage cycle eff %.0f %%, half-time %.0f days\ninitial = %.0f max = %.0f  end = %.0f'% (
         shortsteff*100,shorthalfw/24,shortststart,stomax,shortstend))
+    plt.ylabel("Opslag vulling (GWh)")
     plt.title(title)
     figname = "../output/shortst_fill_"+my_inst_str+'.png';
     sns_plot.figure.savefig(figname,dpi=300) 
@@ -517,8 +579,8 @@ add_shortst_mem(landyrframe ,glb_inst_short,inst_str)
 #nu run opnieuw met andere parameters
 def run_again (cdf,my_inst_opw, my_inst_long,my_inst_short):
     my_inst_str=yrtomodel+my_inst_opw
-    landyrframe= mkusopw(egasyr,yset7t0,yrtomodel,my_inst_opw)
-    mkovplot(landyrframe,yrtomodel,my_inst_opw,my_inst_str) 
+    cdf= mkusopw(egasyr,yset7t0,yrtomodel,my_inst_opw)
+    mkovplot(cdf,yrtomodel,my_inst_opw,my_inst_str) 
     plt.show()
     my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
     add_longst_io(cdf ,my_inst_long,my_inst_short,my_inst_str)    
@@ -543,3 +605,23 @@ run_again (landyrframe.copy(),glb_inst_opw,'D','A')
 run_again (landyrframe.copy(),glb_inst_opw,'C','A')  
 
 
+# +
+def optlst(indf):
+    lcol= indf.index.values+" - "+indf['omschr']
+    return lcol.tolist()
+
+def recalc(my2_inst_jaar,my2_inst_verbr,my2_inst_opw,my2_inst_long='B',my2_inst_short='A'):
+    run_again (
+       landyrframe.copy(),
+       my2_inst_opw[0:1],
+       my2_inst_long[0:1],
+       my2_inst_short[0:1]  )
+    
+interact(
+   recalc ,
+       my2_inst_jaar=Dropdown(options=[yrtomodel], description='Data jaar:'),    
+       my2_inst_verbr=Dropdown(options=optlst(param_verbr_df), description='Verbruik:'),    
+       my2_inst_opw=Dropdown(options=optlst(param_opw_df), description='Opwek mix:'),
+       my2_inst_long=Dropdown(options=optlst(param_longdf), description='Long-term:'),
+       my2_inst_short=Dropdown(options=optlst(param_shortdf), description='Short-term:')                   
+)

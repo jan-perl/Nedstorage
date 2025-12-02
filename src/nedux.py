@@ -42,19 +42,26 @@ import nedsumm01
 
 # +
 # # !pip install pandas matplotlib ipywidgets
-# -
 
-def recalc(my2_inst_opw,my2_inst_long,my2_inst_short):
+# +
+def optlst(indf):
+    lcol= indf.index.values+" - "+indf['omschr']
+    return lcol.tolist()
+
+def recalc(my2_inst_jaar,my2_inst_opw,my2_inst_long,my2_inst_short):
     nedsumm01.run_again (
        nedsumm01.landyrframe.copy(),
-       my2_inst_opw,
-       my2_inst_long,
-       my2_inst_short     )
+       my2_inst_opw[0:1],
+       my2_inst_long[0:1],
+       my2_inst_short[0:1]  )
+    
 interact(
    recalc ,
-       my2_inst_opw=Dropdown(options=nedsumm01.param_opw_df.index.values.tolist(), description='Opwek mix:'),
-       my2_inst_long=Dropdown(options=nedsumm01.param_longdf.index.values.tolist(), description='Long-term:'),
-       my2_inst_short=Dropdown(options=nedsumm01.param_shortdf.index.values.tolist(), description='Short-term:')                   
+       my2_inst_jaar=Dropdown(options=[nedsumm01.yrtomodel], description='Data jaar:'),    
+       my2_inst_opw=Dropdown(options=optlst(nedsumm01.param_opw_df), description='Opwek mix:'),
+       my2_inst_long=Dropdown(options=optlst(nedsumm01.param_longdf), description='Long-term:'),
+       my2_inst_short=Dropdown(options=optlst(nedsumm01.param_shortdf), description='Short-term:')                   
 )
+# -
 
 
