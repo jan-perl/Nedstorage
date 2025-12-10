@@ -226,9 +226,6 @@ mkuurpl3gr(egasyr[egasyr['energytypenr'].isin ({1,2,17})].copy(),"opwek ",'opw',
 
 mkuurpl3grc(egasyr[egasyr['energytypenr'].isin ({1,2,17})].copy(),"opwek ",'opw',yrtomodel)
 
-figcmb, axcmb = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
-figcmb.tight_layout(pad=4)
-
 # +
 #inst_opw bepaalt opwek instelling
 glb_inst_opw='A'
@@ -298,9 +295,12 @@ def mkovplot(dfin,yrstr,my_inst_opw,my_inst_str,ax):
     ax.legend(bbox_to_anchor=(0.75, 0.99), loc=0, borderaxespad=0.)
     ax.set_ylabel("Uurvermogen (GW) of (Gwh/hr)")
     ax.set_xlabel("datum (gegevens per uur)")
-#    figname = "../output/eneuthr_hr_"+my_inst_str+'.png';
+    figname = "../output/eneuthr_hr_"+my_inst_str+'.png';
 #    sns_plot.figure.savefig(figname,dpi=300) 
-mkovplot(landyrframe,yrtomodel,glb_inst_opw,inst_str,axcmb[0,0])    
+    return figname 
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+mkovplot(landyrframe,yrtomodel,glb_inst_opw,inst_str,ax)    ,dpi=300) 
 
 # balans over het jaar, in GWh
 sns.lineplot(data=landyrframe,x="validfrom",y="balans",ci=None) 
@@ -314,9 +314,11 @@ def cumbalplot(cframe,my_inst_str,ax):
     title= "cumulatieve uurbalansen %s, overschot = %.0f (= %.1f %% van jaarverbruik)" % (
          inst_str,lastw,100*lastw/totv)
     ax.set_title(title)
-#    figname = "../output/eneuthr_cum_"+inst_str+'.png';
-#    sns_plot.figure.savefig(figname,dpi=300) 
-cumbalplot(landyrframe,inst_str,axcmb[0,1])    
+    figname = "../output/eneuthr_cum_"+inst_str+'.png';
+    return(figname)
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+cumbalplot(landyrframe,inst_str,ax)    ,dpi=300)
 
 
 #extra opwek (nodig vanwege opslag verliezen) relatief t.o.v. jaarverbruik
@@ -327,11 +329,10 @@ def plotreovsch(cframe):
 plotreovsch(landyrframe.copy(deep=False))    
 
 
-# +
 #grafiek: te lezen vanaf links
 #als je opslag laadt vanaf een bepaalde grens (GW , of GWh/uur), hoe veel 
 #totaal niet direct verbruikt vermogen (GWh) is dan per jaar beschikbaar ?
-def balansstats(df,col,totpwr,my_inst_str,ax):
+def balansstats(df,col,totpwr,my_inst_str,ax,color):
     balansfreq0=df[[col]].sort_values(col,ascending=False).copy().reset_index()
     balansfreq0['n']=balansfreq0.index
     balansfreq0['totpwr']=balansfreq0[col].cumsum()
@@ -343,21 +344,27 @@ def balansstats(df,col,totpwr,my_inst_str,ax):
         avg= balansfreq0[col].mean()
         hrlow= (balansfreq0[col] < avg/10).sum()
         tit=(" %s %s average %.1f, hrs below %.2f : %.0f"%(col,inst_str,avg,avg/10,hrlow))
-#    plt.clf()
     if totpwr:
-        p=sns.lineplot(ax=ax,data=balansfreq0,y="totpwr",x="balans",ci=None) 
+        p=sns.lineplot(ax=ax,data=balansfreq0,y="totpwr",x="balans",ci=None,color=color) 
+        dfc=balansfreq0.copy(deep=False)
+        dfc['vert']=dfc["balans"]*0
+        p=sns.lineplot(ax=ax,data=dfc,y="totpwr",x="vert",alpha=0.2,ci=None,estimator=None,color=color) 
         ax.set_xlabel("bij overschotten boven dit vermogen (GW)")
         ax.set_ylabel("blijft jaarlijks dit over (GWh)")
-#        figname = "../output/"+col+"iocum_"+my_inst_str+'.png';
-#        p.figure.savefig(figname,dpi=300) 
+        figname = "../output/"+col+"iocum_"+my_inst_str+'.png';
     else:
-        p=sns.lineplot(ax=ax,data=balansfreq0,x="n",y=col,ci=None) 
+        p=sns.lineplot(ax=ax,data=balansfreq0,x="n",y=col,ci=None,color=color) 
+        dfc=balansfreq0.copy(deep=False)
+        dfc['hor']=dfc["n"]*0
+        p=sns.lineplot(ax=ax,data=dfc,x="n",y='hor',alpha=0.2,ci=None,color=color) 
+        ax.set_xlabel("uren in jaar")
+        ax.set_ylabel("ycol")
         ax.set_title(tit)
-#        figname = "../output/"+col+"iohrs_"+my_inst_str+'.png';
-#        p.figure.savefig(figname,dpi=300) 
-
-balansstats(landyrframe, "balans",True,inst_str,axcmb[0,2])
-# -
+        figname = "../output/"+col+"iohrs_"+my_inst_str+'.png';
+    return figname 
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+balansstats(landyrframe, "balans",True,inst_str,ax,'green'),dpi=300) 
 
 #grafiek: te lezen vanaf links
 #als je opslag laadt vanaf een bepaalde grens (GW , of GWh/uur), hoe veel 
@@ -368,7 +375,7 @@ balansfreq0['totpwr']=balansfreq0['balans'].cumsum()
 sns.lineplot(data=balansfreq0,y="totpwr",x="balans",ci=None) 
 
 fig,ax= plt.subplots(figsize=(10,6))
-balansstats(landyrframe, "opwek",False,inst_str,ax)
+balansstats(landyrframe, "opwek",False,inst_str,ax,'green')
 
 #keuzes modellen
 glb_inst_long='A'
@@ -396,9 +403,17 @@ B,0.9,4000,4,7,kopie van A"""
 param_shortdf= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
 
 
-# -
+# +
+def shortst_init_decay(my_inst_short):
+    param_short= param_shortdf.to_dict('index')[my_inst_short]
+    shortsteff=param_short['steff']
+    shortststart=param_short['ststart']
+    shorthalfw=param_short['wkhalf']*7*24
+    #bereken gemiddelde verliezen korte termijn
+    avgshusg = shortststart * (np.log(2)/shorthalfw) / shortsteff
+    return avgshusg
 
-def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str,ax,color):
+def add_longst_io(df,my_inst_long,avgshusg,my_inst_str,ax,color):
     param_long=param_longdf.to_dict('index')[my_inst_long]
     print(param_long)
 
@@ -406,12 +421,7 @@ def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str,ax,color):
     #longsteff=param_long['steff']    
     #bereken de outflow per uur om het short-term storage te onderhouden
     #dit is een gemiddeld systeem verlies dat het short-term storage ieder uur gemiddeld verbruikt
-    param_short= param_shortdf.to_dict('index')[my_inst_short]
-    shortsteff=param_short['steff']
-    shortststart=param_short['ststart']
-    shorthalfw=param_short['wkhalf']*7*24
-    #bereken gemiddelde verliezen korte termijn
-    avgshusg = shortststart * (np.log(2)/shorthalfw) / shortsteff
+
     #voeg gemiddelde verliezen korte termijn toe aan balans
     balans1= df ["balans" ] - avgshusg
     repyr=pd.concat ( [ balans1, balans1[0:nhrslong]  ] ).cumsum()
@@ -434,17 +444,18 @@ def add_longst_io(df,my_inst_long,my_inst_short,my_inst_str,ax,color):
            param_long['athresh'],param_long['afact'])
     ax.set_ylabel("Uurbalans (GW of GWh)")
     ax.set_title(title)
-#    figname = "../output/longst_io_"+my_inst_str+'.png';
-#    sns_plot.figure.savefig(figname,dpi=300) 
-add_longst_io(landyrframe ,glb_inst_long,glb_inst_short,inst_str,axcmb[1,0],'green')    
-
-cfigname = "../output/cmb_"+inst_str+'.png';
-figcmb.savefig(cfigname,dpi=300) 
-figcmb
+    figname = "../output/longst_io_"+my_inst_str+'.png';
+    return figname 
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+  add_longst_io(landyrframe ,glb_inst_long,shortst_init_decay( glb_inst_short),
+                inst_str,ax,'green')   ,dpi=300) 
+# -
 
 sns.lineplot(data=landyrframe,x="validfrom",y="longtermst",ci=None) 
 
-balansstats(landyrframe, "tolongterm",False,inst_str,axcmb[1,2])
+fig,ax= plt.subplots(figsize=(10,6))
+balansstats(landyrframe, "tolongterm",False,inst_str,ax,'green')
 
 
 #longststart
@@ -455,28 +466,40 @@ def add_longst_mem(df,my_inst_long,sizmul,my_inst_str,ax,color):
           df ["tolongterm" ]<0,df ["tolongterm" ] *param_long['steff']),
           ststart,param_long['yrhalf']*365*24,0,4*ststart)  
     empty=df [df ["longtermsd" ] ==0 ].copy().reset_index()
+    stoend= df.tail(1)["longtermsd"]
+    stomax=df["longtermsd"].max()
+#    sns.lineplot(ax=ax,data=df,x="validfrom",y="longtermst",label="cum. balans",ci=None) 
+    multk=0.001
+    spar =('ini %.0fk max = %.0fk end=%.0fk '% (ststart*multk,stomax*multk,stoend*multk))
     if empty.size !=0:
         print("WARNING: storage gets empty")
         print(empty["validfrom"])
+        spar=spar+ "GOT EMPTY "
     else:    
         print("OK: storage does not get empty")
-    stoend= df.tail(1)["longtermsd"]
     if (stoend< ststart).any()  :
         print("WARNING: storage depleted over year %.0f < %.0f" % (stoend , ststart))
+        spar=spar+ "DEPLETED "
     else:        
         print("OK: storage surplus over year %.0f >%.0f" % (stoend , ststart))
-    stomax=df["longtermsd"].max()
-#    sns.lineplot(ax=ax,data=df,x="validfrom",y="longtermst",label="cum. balans",ci=None) 
-    sns_plot=sns.lineplot(ax=ax,data=df,x="validfrom",y="longtermsd",label="storage",c=color,ci=None) 
+
+    sns_plot=sns.lineplot(ax=ax,data=df,x="validfrom",y="longtermsd",label=spar,color=color,ci=None) 
+    dfc=df.copy(deep=False)
+    dfc['initv'] =ststart 
+    sns_plot=sns.lineplot(ax=ax,data=dfc,x="validfrom",y="initv",alpha=0.2,label="",color=color,ci=None) 
+    
     title= 'Long-time storage filling '+my_inst_str
-    title = title +('\nstorage cycle eff %.0f %%, half-time %.1f yr\ninitial = %.0f max = %.0f end=%.0f'% (
-        param_long['steff']*100,param_long['yrhalf'],ststart,stomax,stoend))
+    title = title +('\nstorage cycle eff %.0f %%, half-time %.1f yr'% (
+        param_long['steff']*100,param_long['yrhalf']))
     ax.set_title(title)
     ax.set_ylabel("Opslag vulling (GWh)")
     ax.legend(bbox_to_anchor=(0.05, 0.95), loc=2, borderaxespad=0.)
-#    figname = "../output/longst_fill_"+my_inst_str+'.png';
+    figname = "../output/longst_fill_"+my_inst_str+'.png';
+    return (figname)
 #    sns_plot.figure.savefig(figname,dpi=300) 
-add_longst_mem(landyrframe ,glb_inst_long,1.0,inst_str,axcmb[1,1],'green')        
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+add_longst_mem(landyrframe ,glb_inst_long,1.0,inst_str,ax,'green')    ,dpi=300)     
 
 
 # +
@@ -499,14 +522,17 @@ def add_shortst_io(df,my_inst_long,my_inst_short,my_inst_str,ax,color):
     title= 'Short-time storage usage\nLong out smooth %.0f days, in if hour > %0d GW'%(
           param_long['ndayslong'],param_long['stthresh'])
     ax.set_title(title)
-#    figname = "../output/shortst_io_"+my_inst_str+'.png';
-#    sns_plot.figure.savefig(figname,dpi=300) 
-add_shortst_io(landyrframe ,glb_inst_long,glb_inst_short,inst_str,axcmb[2,0],'green')    
+    figname = "../output/shortst_io_"+my_inst_str+'.png';
+    return(figname)
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+add_shortst_io(landyrframe ,glb_inst_long,glb_inst_short,inst_str,ax,'green')     ,dpi=300)     
 
 #opslag zonder halfwaardetijd en maxima
 sns.lineplot(data=landyrframe,x="validfrom",y="shorttermst",ci=None) 
 
-balansstats(landyrframe, "toshortterm",False,inst_str,axcmb[2,2])
+fig,ax= plt.subplots(figsize=(10,6))
+balansstats(landyrframe, "toshortterm",False,inst_str,ax,'green')
 
 
 # +
@@ -526,66 +552,155 @@ def add_shortst_mem(df,my_inst_short,sizmul,my_inst_str,ax,color):
           df ["toshortterm" ]<0,df ["toshortterm" ] *shortsteff) 
                                            ,shortststart,shorthalfw,0,shortmaxsto)  
     empty=df [df ["shorttermsd" ] ==0 ].copy().reset_index()
+    shortstend=  df.tail(1)["shorttermsd"] 
+    stomax=df["shorttermsd"].max()
+    multk=0.001
+    spar =('ini %.0fk max = %.0fk end=%.0fk '% (shortststart*multk,stomax*multk,shortstend*multk))    
+    
     if empty.size !=0:
         print("WARNING: storage gets empty")
         print(empty["validfrom"])
+        spar=spar+ "GOT EMPTY "
     else:    
         print("OK: storage does not get empty")
-    shortstend=  df.tail(1)["shorttermsd"] 
     if (shortstend< shortststart).any()  :
         print("WARNING: storage depleted over year %.0f < %.0f" % (shortstend , shortststart))        
+        spar=spar+ "DEPLETED "
 #    plt.clf() 
-    sns_plot=sns.lineplot(ax=ax,data=df,x="validfrom",y="shorttermsd",color=color,ci=None) 
-    stomax=df["shorttermsd"].max()
+    sns_plot=sns.lineplot(ax=ax,data=df,x="validfrom",y="shorttermsd",label=spar ,color=color,ci=None) 
+    dfc=df.copy(deep=False)
+    dfc['initv'] =shortststart 
+    sns_plot=sns.lineplot(ax=ax,data=dfc,x="validfrom",y="initv",alpha=0.2,label="",color=color,ci=None) 
+    
     title= 'Short-time storage filling '+my_inst_str
-    title = title +('\nstorage cycle eff %.0f %%, half-time %.0f days\ninitial = %.0f max = %.0f  end = %.0f'% (
-        shortsteff*100,shorthalfw/24,shortststart,stomax,shortstend))
+    title = title +('\nstorage cycle eff %.0f %%, half-time %.0f days'% (
+        shortsteff*100,shorthalfw/24))
     ax.set_ylabel("Opslag vulling (GWh)")
     ax.set_title(title)
-#    figname = "../output/shortst_fill_"+my_inst_str+'.png';
-#    sns_plot.figure.savefig(figname,dpi=300) 
-add_shortst_mem(landyrframe ,glb_inst_short,1.0,inst_str,axcmb[2,1],'green')        
+    figname = "../output/shortst_fill_"+my_inst_str+'.png';
+    return (figname)
+fig,ax= plt.subplots(figsize=(10,6))
+fig.savefig(
+add_shortst_mem(landyrframe ,glb_inst_short,1.0,inst_str,ax,'green')   ,dpi=300)         
 
-figcmb.savefig(cfigname,dpi=300) 
-figcmb
+
+# +
+#nu run opnieuw met andere parameters
+def run_again (cdf,my_inst_opw, my_inst_long,my_inst_short):
+    my_inst_str=yrtomodel+my_inst_opw
+    figcmbl, axcmbl = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
+    figcmbl.tight_layout(pad=4)
+    cdf= mkusopw(egasyr,yset7t0,yrtomodel,my_inst_opw)
+    mkovplot(cdf,yrtomodel,my_inst_opw,my_inst_str,axcmbl[0,0]) 
+#    plt.show()
+    my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
+    cumbalplot(cdf,my_inst_str,axcmbl[0,1])    
+    balansstats(cdf, "balans",True,my_inst_str,axcmbl[0,2],'green')
+    add_longst_io(cdf ,my_inst_long,shortst_init_decay( my_inst_short),my_inst_str,axcmbl[1,0],'green'  )    
+#    plt.clf()
+    balansstats(cdf, "tolongterm",False,my_inst_str,axcmbl[1,1],'green')
+#    plt.clf()
+    add_longst_mem(cdf ,my_inst_long,1.0,my_inst_str,axcmbl[1,2],'green' )   
+#    plt.show()
+#    plt.clf()
+    add_shortst_io(cdf ,my_inst_long,my_inst_short,my_inst_str,axcmbl[2,0],'green')        
+#    plt.clf()
+    balansstats(cdf, "toshortterm",False,my_inst_str,axcmbl[2,1],'green')
+#    plt.clf()
+    add_shortst_mem(cdf ,my_inst_short,1.0,my_inst_str,axcmbl[2,2],'green') 
+    cfiglname = "../output/cmb_"+inst_str+'.png';
+    figcmbl.savefig(cfiglname,dpi=300) 
+    return figcmbl
+    
+run_again (landyrframe.copy(),glb_inst_opw,'D','B')  
 
 # +
 #nieuwe manier van warmte apart
 # -
 
-figcmbw, axcmbw = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
-figcmbw.tight_layout(pad=4)
+some_string="""inst,long_w,short_w,wlongfrac,wshuse,wpompfr,initrezis,omschr
+W,_,_,0.91,1,0.05,0.25,Eerste poging
+T,_,_,0,0,1.0,1.0,Niets naar warmte
+E,E,_,0.91,1,0.05,0.25,Warmte eff long"""
+    #read CSV string into pandas DataFrame
+param_warmlosdf= pd.read_csv(io.StringIO(some_string), sep=",").set_index('inst')
 
-landyrframe_e = landyrframe.copy()
-landyrframe_e['balans'] = landyrframe_e['balans'] + 0.95*landyrframe_e['warmtevbr']
-add_longst_io(landyrframe_e ,glb_inst_long,glb_inst_short,inst_str+'E',axcmbw[1,0],'blue')   
-wlongtermfact=0.91
-landyrframe_e ["tolongtermw" ] = ( wlongtermfact) *landyrframe_e ["tolongterm" ].where (
-          landyrframe_e ["tolongterm" ] >0,0)
-landyrframe_e ["tolongterm" ] = landyrframe_e ["tolongterm" ] - landyrframe_e ["tolongtermw" ]
-#sns_plot=sns.scatterplot(data=landyrframe_e,x="validfrom",y="tolongterm") 
-add_longst_mem(landyrframe_e ,glb_inst_long,0.25,inst_str+'E',axcmbw[1,1],'blue') 
-landyrframe_e['balans'] = landyrframe_e['balans'] - landyrframe_e ["tolongtermw" ]
 
-add_shortst_io(landyrframe_e ,glb_inst_long,glb_inst_short,inst_str+'E',axcmbw[2,0],'blue') 
-add_shortst_mem(landyrframe_e ,glb_inst_short,1.0,inst_str+'E',axcmbw[2,1],'blue')   
+# +
+def mkovplotw(dfin,yrstr,my_inst_opw,my_inst_str,ax):
+    param_opw=get_param_opw(yrstr,my_inst_opw)
+#    print(param_opw)
+    df=dfin.copy(deep=False)
+    df['nietwarmte'] = df ["verbruik"] - df["warmtevbr"]
+    sns.lineplot(ax=ax,data=df,x="validfrom",y="warmtevbr",ci=None,label='warmte',color='red') 
+    sns_plot=sns.lineplot(ax=ax,data=df,x="validfrom",y="nietwarmte",ci=None,
+                          label='nietwarmte',color='blue')  
+    avgverbruik=df['verbruik'].mean()    
 
-landyrframe_w = landyrframe_e.copy()
-landyrframe_w['balans'] = - landyrframe_w['warmtevbr']
-#glb_inst_long_w='E'
-wpmul=1
-add_longst_io(landyrframe_w ,glb_inst_long,glb_inst_short,inst_str+'W',axcmbw[1,0],'red')    
-landyrframe_w ["tolongterm" ] = landyrframe_w ["tolongterm" ] +wpmul*landyrframe_w ["tolongtermw" ] 
-#sns_plot=sns.scatterplot(data=landyrframe_w,x="validfrom",y="tolongterm") 
-add_longst_mem(landyrframe_w ,glb_inst_long,1.0,inst_str+'W',axcmbw[1,1],'red') 
-landyrframe_w['balans'] = landyrframe_w['balans'] + wpmul*landyrframe_w ["tolongtermw" ]
+#    ax.set_title(ptit)
+    ax.legend(bbox_to_anchor=(0.75, 0.99), loc=0, borderaxespad=0.)
+    ax.set_ylabel("Uurvermogen (GW) of (Gwh/hr)")
+    ax.set_xlabel("datum (gegevens per uur)")
+    figname = "../output/eneuthr_hr_"+my_inst_str+'.png';
+#    sns_plot.figure.savefig(figname,dpi=300) 
+    return figname 
 
-add_shortst_io(landyrframe_w ,glb_inst_long,glb_inst_short,inst_str+'W',axcmbw[2,0],'red') 
-add_shortst_mem(landyrframe_w ,glb_inst_short,0.25,inst_str+'W',axcmbw[2,1],'red')   
 
-cfigwname = "../output/cmbw_"+inst_str+'.png';
-figcmbw.savefig(cfigwname,dpi=300) 
-figcmbw
+# +
+def run_againw (cdf,my_inst_opw, my_inst_long,my_inst_short,my_inst_w):
+    param_w= param_warmlosdf.to_dict('index')[my_inst_w]
+    
+    my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short+my_inst_w    
+    figcmbw, axcmbw = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
+    figcmbw.tight_layout(pad=4)
+
+    mkovplotw(cdf,yrtomodel,my_inst_opw,my_inst_str,axcmbw[0,0]) 
+
+    cdf_e = cdf.copy()
+    cdf_e['balans'] = cdf_e['balans'] +( 1- param_w['wpompfr'] )*cdf_e['warmtevbr']
+    add_longst_io(cdf_e ,my_inst_long,shortst_init_decay( my_inst_short),my_inst_str+'E',axcmbw[1,0],'blue')   
+    wlongtermfact=param_w['wlongfrac']
+    winitrezis=param_w['initrezis']
+    cdf_e ["tolongtermw" ] = ( wlongtermfact) *cdf_e ["tolongterm" ].where (
+              cdf_e ["tolongterm" ] >0,0)
+    cdf_e ["tolongterm" ] = cdf_e ["tolongterm" ] - cdf_e ["tolongtermw" ]
+    #sns_plot=sns.scatterplot(data=cdf_e,x="validfrom",y="tolongterm") 
+    balansstats(cdf_e, "tolongterm",False,my_inst_str+'E',axcmbw[1,1],'blue')
+
+    add_longst_mem(cdf_e ,glb_inst_long,winitrezis,my_inst_str+'E',axcmbw[1,2],'blue') 
+    cdf_e['balans'] = cdf_e['balans'] - cdf_e ["tolongtermw" ]  
+
+    add_shortst_io(cdf_e ,my_inst_long,my_inst_short,my_inst_str+'E',axcmbw[2,0],'blue') 
+    balansstats(cdf_e, "toshortterm",False,my_inst_str+'E',axcmbw[2,1],'blue')
+    add_shortst_mem(cdf_e ,my_inst_short,1.0,my_inst_str+'E',axcmbw[2,2],'blue') 
+
+    cdf_w = cdf_e.copy()
+    cdf_w['balans'] = - cdf_w['warmtevbr'] *param_w['wshuse']
+    
+    my_inst_long_w=param_w['long_w']
+    if (my_inst_long_w == '_'):
+        my_inst_long_w = my_inst_long
+    my_inst_short_w=param_w['short_w']
+    if (my_inst_short_w == '_'):
+        my_inst_short_w = my_inst_short
+    add_longst_io(cdf_w ,my_inst_long_w,winitrezis*param_w['wshuse'] *shortst_init_decay( my_inst_short_w),
+                  my_inst_str+'W',axcmbw[1,0],'red')    
+    cdf_w ["tolongterm" ] = cdf_w ["tolongterm" ] +cdf_w ["tolongtermw" ] 
+    #sns_plot=sns.scatterplot(data=cdf_w,x="validfrom",y="tolongterm") 
+    balansstats(cdf_w, "tolongterm",False,my_inst_str+'W',axcmbw[1,1],'red')
+    add_longst_mem(cdf_w ,my_inst_long_w,param_w['wshuse'] ,my_inst_str+'W',axcmbw[1,2],'red') 
+    cdf_w['balans'] = cdf_w['balans'] + cdf_w ["tolongtermw" ]
+
+    add_shortst_io(cdf_w ,my_inst_long_w,my_inst_short_w,my_inst_str+'W',axcmbw[2,0],'red') 
+    balansstats(cdf_w, "toshortterm",False,my_inst_str+'W',axcmbw[2,1],'red')
+    add_shortst_mem(cdf_w ,my_inst_short_w,winitrezis*param_w['wshuse'],my_inst_str+'W',axcmbw[2,2],'red')    
+                         
+    cfigwname = "../output/cmbw_"+my_inst_str+'.png';
+    figcmbw.savefig(cfigwname,dpi=300) 
+    return figcmbw                         
+                         
+run_againw (landyrframe.copy(),glb_inst_opw,glb_inst_long,glb_inst_short,'E')
+1
 
 
 # +
@@ -625,37 +740,6 @@ def calclong_warmfrac(dfin,my_inst_long,my_inst_short,my_inst_str):
 #    sns.scatterplot(data=df, x="validfrom",y= "longtermnaarwarmte" )
     
 calclong_warmfrac(landyrframe ,glb_inst_long,glb_inst_short,inst_str)
-
-
-# +
-#nu run opnieuw met andere parameters
-def run_again (cdf,my_inst_opw, my_inst_long,my_inst_short):
-    my_inst_str=yrtomodel+my_inst_opw
-    figcmbl, axcmbl = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
-    figcmbl.tight_layout(pad=4)
-    cdf= mkusopw(egasyr,yset7t0,yrtomodel,my_inst_opw)
-    mkovplot(cdf,yrtomodel,my_inst_opw,my_inst_str,axcmbl[0,0]) 
-#    plt.show()
-    my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
-    cumbalplot(cdf,my_inst_str,axcmbl[0,1])    
-    balansstats(cdf, "balans",True,my_inst_str,axcmbl[0,2])
-    add_longst_io(cdf ,my_inst_long,my_inst_short,my_inst_str,axcmbl[1,0],'green'  )    
-#    plt.clf()
-    balansstats(cdf, "tolongterm",False,my_inst_str,axcmbl[1,2])
-#    plt.clf()
-    add_longst_mem(cdf ,my_inst_long,1.0,my_inst_str,axcmbl[1,1],'green' )   
-#    plt.show()
-#    plt.clf()
-    add_shortst_io(cdf ,my_inst_long,my_inst_short,1.0,my_inst_str,axcmbl[2,0],'green')        
-#    plt.clf()
-    balansstats(cdf, "toshortterm",False,my_inst_str,axcmbl[2,2])
-#    plt.clf()
-    add_shortst_mem(cdf ,my_inst_short,my_inst_str,axcmbl[2,1],'green') 
-    cfiglname = "../output/cmb_"+inst_str+'.png';
-    figcmbl.savefig(cfiglname,dpi=300) 
-    return figcmbl
-    
-run_again (landyrframe.copy(),glb_inst_opw,'D','B')  
 # -
 
 #regressietest op lang model A voor zo lang short model B zelfde parameters heeft als A
