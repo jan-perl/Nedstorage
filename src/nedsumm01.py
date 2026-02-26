@@ -277,7 +277,7 @@ yset7t0yrs
 opwkyrin=egasyr[egasyr['energytypenr'].isin ({1,2,17})].copy()
 mkuurpl3gr(opwkyrin,"opwek ",'opw',yrtomodel,0.8)
 
-opwkpyrs=opwkyrin[['volume','energytype','jaar']].groupby(['energytype','jaar']).agg('sum')*3.6
+opwkpyrs=opwkyrin[['volume','energytype','jaar']].groupby(['energytype','jaar']).agg('sum')
 opwkpyrs=opwkpyrs.reset_index()
 opwknormyr=2025
 opwkpyrs=opwkpyrs.merge (opwkpyrs[opwkpyrs['jaar'] ==opwknormyr] [['volume','energytype']].
@@ -324,9 +324,9 @@ def mkusopw(opwkyrindf,yset7t0df,yrstr,inst_opw):
     yset8t0=mkrestcat(opwkyrindf,{1:param_opw['windmult'],
                                2:param_opw['windmult'] * param_opw['zonrel'],
                                17:param_opw['windmult']},1)
-#    totvol=yset8t0[['volume','energytype']].groupby('energytype').agg('sum')*3.6
+#    totvol=yset8t0[['volume','energytype']].groupby('energytype').agg('sum')
 #    print(totvol)
-    cntrec(yset8t0)
+#    cntrec(yset8t0)
 #    print (yset8t0.sort_values("validfrom"))
     oframe= yset8t0[['volume',"validfrom",'jaar']].rename(columns={"volume":"opwek"})
                  
@@ -337,7 +337,7 @@ def mkusopw(opwkyrindf,yset7t0df,yrstr,inst_opw):
     totvol=cframe[['verbruik','opwek','balans','warmtevbr','jaar']].groupby(['jaar']).agg('sum')
     print(totvol)
     return (cframe)
-               
+           
 landyrframe= mkusopw(opwkyr,yset7t0,yrtomodel,glb_inst_opw)
 landyrframe.dtypes            
 
@@ -671,17 +671,22 @@ add_shortst_mem(landyrframe ,glb_inst_short,1.0,inst_str,ax,'green')   ,dpi=300)
 
 # +
 #nu run opnieuw met andere parameters
-def run_again (cdf_discard,my_inst_opw, my_inst_long,my_inst_short):
+def setup_run_againrats (cdf_discard,my_inst_opw, my_inst_long,my_inst_short,axcmbl):
     my_inst_str=yrtomodel+my_inst_opw
-    figcmbl, axcmbl = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
-    figcmbl.tight_layout(pad=4)
-    cdf= mkusopw(opwkyr,gr3usdf,yset7t0,yrtomodel,my_inst_opw)
+    cdf= mkusopw(opwkyr,yset7t0,yrtomodel,my_inst_opw)
     mkovplot(cdf,yrtomodel,my_inst_opw,my_inst_str,axcmbl[0,0]) 
 #    plt.show()
     my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
     cumbalplot(cdf,my_inst_str,axcmbl[0,1],'green')    
     balansstats(cdf, "balans",True,my_inst_str,axcmbl[0,2],'green')
-    add_longst_io(cdf ,my_inst_long,shortst_init_decay( my_inst_short),my_inst_str,axcmbl[1,0],'green'  )    
+    add_longst_io(cdf ,my_inst_long,shortst_init_decay( my_inst_short),my_inst_str,axcmbl[1,0],'green'  ) 
+    return cdf
+
+def run_again (cdf_discard,my_inst_opw, my_inst_long,my_inst_short):
+    figcmbl, axcmbl = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
+    figcmbl.tight_layout(pad=4)
+    cdf= setup_run_againrats (cdf_discard,my_inst_opw, my_inst_long,my_inst_short,axcmbl)
+    my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
 #    plt.clf()
     balansstats(cdf, "tolongterm",False,my_inst_str,axcmbl[1,1],'green')
 #    plt.clf()
@@ -739,7 +744,7 @@ def run_againw (cdf_discard,my_inst_opw, my_inst_long,my_inst_short,my_inst_w):
 
     figcmbw, axcmbw = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
     figcmbw.tight_layout(pad=4)
-    cdf= mkusopw(opwkyr,gr3usdf,yset7t0,yrtomodel,my_inst_opw)
+    cdf= mkusopw(opwkyr,yset7t0,yrtomodel,my_inst_opw)
     mkovplot(cdf,yrtomodel,my_inst_opw,my_inst_str,axcmbw[0,0]) 
     
     my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short+my_inst_w   
@@ -795,13 +800,15 @@ def run_againw (cdf_discard,my_inst_opw, my_inst_long,my_inst_short,my_inst_w):
 run_againw (landyrframe.copy(),glb_inst_opw,glb_inst_long,glb_inst_short,'E')
 1
 
-
 # +
 #oude manier van warmte
+# -
+
+
 
 # +
 ### deel lange termijn opname voor warmte
-def calclong_warmfrac(dfin,my_inst_long,my_inst_short,my_inst_str):
+def calclong_warmfrac(dfin,my_inst_long,my_inst_short,my_inst_str,ax,color):  
     df=dfin.copy()
     param_long=param_longdf.to_dict('index')[my_inst_long]
     print(param_long)
@@ -816,7 +823,7 @@ def calclong_warmfrac(dfin,my_inst_long,my_inst_short,my_inst_str):
 #    df ["longtermnaarwarmte"] = df ["multdaywarmtevbrsm" ]/ df ["fromlongterm"] 
     df ["longtermnaarwarmte"] = df ["fromlongterm"].where (df ["fromlongterm"]< df ["multdaywarmtevbrsm" ], 
                                                            df ["multdaywarmtevbrsm" ])
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    ax1=ax
     sns.scatterplot(data=df, x="validfrom",y= "fromlongterm",label="Totaal uit long",ax=ax1 )
     sns.scatterplot(data=df, x="validfrom",y= "longtermnaarwarmte" ,label="Als warmte uit long",ax=ax1)
     # Create and plotting the secondary y-axis data
@@ -831,8 +838,15 @@ def calclong_warmfrac(dfin,my_inst_long,my_inst_short,my_inst_str):
     ax1.legend( loc='upper left')
     ax2.legend( loc='upper center')
 #    sns.scatterplot(data=df, x="validfrom",y= "longtermnaarwarmte" )
-    
-calclong_warmfrac(landyrframe ,glb_inst_long,glb_inst_short,inst_str)
+
+def run_again_oldw (cdf_discard,my_inst_opw, my_inst_long,my_inst_short):
+    figcmbl, axcmbl = plt.subplots(nrows=3, ncols=3,figsize=(10, 8))
+    figcmbl.tight_layout(pad=4)
+    cdf= setup_run_againrats (cdf_discard,my_inst_opw, my_inst_long,my_inst_short,axcmbl)
+    my_inst_str=yrtomodel+my_inst_opw+my_inst_long+my_inst_short
+    calclong_warmfrac(cdf ,glb_inst_long,glb_inst_short,inst_str,axcmbl[1,1],'green')
+
+run_again_oldw (landyrframe.copy(),glb_inst_opw,'D','B')  
 # -
 
 #regressietest op lang model A voor zo lang short model B zelfde parameters heeft als A
