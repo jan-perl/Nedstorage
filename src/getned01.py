@@ -259,6 +259,22 @@ yset222= getnedvals(params1y22,[23,31],2)
 egasyr22=pd.concat ( [yset221,yset222]) 
 egasyr22.to_pickle("../intermediate/egasyr2022.pkl")
 
+time.sleep(360)
 
+# +
+params1y26= {'point': 0, 'type': 0, 'granularity': 5, 'granularitytimezone': 1, 'classification': 2, 'activity': 1,
+ 'validfrom[strictly_before]': '2026-12-31', 'validfrom[after]': '2026-01-01'}
 
+yset261= getnedvals(params1y26,pset1typs,1)
+# -
 
+time.sleep(360)
+
+yset262= getnedvals(params1y26,[23,31],2)
+#for 2022: No values for 53, No values for 54, No values for 55, No values for 56
+
+#sla gegevens op, zodat laden (waar API key voor nodig is) maak 1 maal hoeft
+egasyr26=pd.concat ( [yset261,yset262]) 
+egasyr26.to_pickle("../intermediate/egasyr2026.pkl")
+
+time.sleep(360)
